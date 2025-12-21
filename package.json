@@ -1,0 +1,20 @@
+{
+  "name": "marketing-assistant",
+  "private": true,
+  "packageManager": "npm@10.8.2",
+  "workspaces": [
+    "packages/*",
+    "services/*"
+  ],
+  "scripts": {
+    "dev": "turbo run dev",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint"
+  },
+  "devDependencies": {
+    "turbo": "latest",
+    "typescript": "^5.0.0",
+    "@types/node": "^20.0.0"
+  }
+}

@@ -1,0 +1,123 @@
+version: '3.8'
+
+services:
+  # Message Bus
+  nats:
+    image: nats:latest
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command: "-js -m 8222" # Enable JetStream and Monitoring
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8222" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: marketing_assistant
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U admin -d marketing_assistant" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Object Storage (S3 Compatible)
+  minio:
+    image: minio/minio
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Object Storage Initialization
+  minio-init:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c " until mc alias set local http://minio:9000 admin password; do echo 'Waiting for MinIO...'; sleep 1; done; mc mb local/analysis-cache || true; mc anonymous set public local/analysis-cache; exit 0; "
+
+  # Tracing
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    environment:
+      COLLECTOR_ZIPKIN_HOST_PORT: :9411
+    ports:
+      - "5775:5775/udp"
+      - "6831:6831/udp"
+      - "6832:6832/udp"
+      - "5778:5778"
+      - "16686:16686" # UI
+      - "14268:14268"
+      - "14250:14250"
+      - "9411:9411"
+
+  # Application Services
+  orchestrator:
+    build:
+      context: .
+      dockerfile: services/orchestrator/Dockerfile
+    environment:
+      - NATS_URL=nats://nats:4222
+      - PORT=3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      nats:
+        condition: service_healthy
+
+  agent-data:
+    build:
+      context: .
+      dockerfile: services/agent-data/Dockerfile
+    environment:
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      nats:
+        condition: service_healthy
+
+  agent-llm-stub:
+    build:
+      context: .
+      dockerfile: services/agent-llm-stub/Dockerfile
+    environment:
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      nats:
+        condition: service_healthy
+
+  agent-report:
+    build:
+      context: .
+      dockerfile: services/agent-report/Dockerfile
+    environment:
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      nats:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
+  minio_data:

@@ -1,0 +1,17 @@
+{
+    "name": "@marketing-assistant/schemas",
+    "version": "0.0.1",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc -w",
+        "lint": "eslint src/**/*.ts"
+    },
+    "dependencies": {
+        "zod": "^3.22.0"
+    },
+    "devDependencies": {
+        "typescript": "^5.0.0"
+    }
+}
