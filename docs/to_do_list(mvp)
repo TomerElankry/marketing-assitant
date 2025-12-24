@@ -1,0 +1,56 @@
+# MVP Implementation TO-DO List (Layer 0)
+
+**Project:** Creative Marketing Strategy Engine (Python Backend)  
+**Goal:** Deliver a functional "Questionnaire → PPTX" pipeline.
+
+---
+
+## 1. Environment & Infrastructure (M0)
+* [ ] **Set up Python Environment:** Initialize a Python 3.10+ project with a virtual environment (`venv`).
+* [ ] **Install Core Dependencies:** `fastapi`, `uvicorn`, `pydantic`, `google-generativeai`, `httpx`, `openai`, `python-pptx`, `sqlalchemy`, `python-dotenv`.
+* [ ] **Secure API Keys:** Create a `.env` file for `GEMINI_API_KEY`, `PERPLEXITY_API_KEY`, and `OPENAI_API_KEY`.
+* [ ] **Initialize Local Storage:**
+    * [ ] Setup a local **Postgres** container for metadata (Project/Job tables).
+    * [ ] Setup a local directory or **MinIO** container to act as the S3-compatible artifact store.
+
+---
+
+## 2. Schema & Validation Agent (Phase 2)
+* [x] **Implement Pydantic Models:** Translate `questionnaire_schema.md` into Pydantic classes for automatic data validation and type safety.
+* [x] **Develop Validation Logic:**
+    * [x] Write the **Gemini System Prompt** for logical quality gatekeeping.
+    * [x] Create the `validation_service` to call the Gemini API and handle `{ "valid": bool, "feedback": [] }` responses.
+* [x] **Expose Intake Endpoint:** Create a FastAPI `POST /jobs` endpoint that triggers the validation gate.
+
+---
+
+## 3. Deep Research Phase (Phase 3)
+* [x] **Develop Perplexity Research Client:**
+    * [x] Create optimized search queries using the questionnaire data (Competitors, USP, Brand Name).
+    * [x] Implement a specific "Sentiment Search" query to gather "The Talk" from social platforms.
+* [ ] **Persistence:** Save raw Perplexity research findings to MinIO/S3 as a JSON artifact linked to the `job_id`.
+
+---
+
+## 4. Analysis & Presentation Layer (Phase 4)
+* [ ] **Implement Creative Analysis (GPT-4o):**
+    * [ ] Feed the research artifact and questionnaire to GPT-4o to generate Hooks, Angles, and Creative Pivots.
+* [ ] **Develop Presentation Structuring Agent (Gemini):**
+    * [ ] Map GPT-4o findings into a slide-by-slide JSON format (Title, Bullets, Visual Context).
+* [ ] **PPTX Rendering Service:**
+    * [ ] Build a utility using **`python-pptx`** to render the JSON slide structure into a professional `.pptx` file.
+* [ ] **Download Endpoint:** Create a `GET /jobs/{id}/download` endpoint that returns a signed URL for the presentation.
+
+---
+
+## 5. Testing & MVP Wrap-up
+* [ ] **End-to-End Test:** Submit a valid questionnaire and verify the generated PowerPoint file manually.
+* [ ] **Validation Stress Test:** Submit "nonsense" data to ensure Gemini accurately blocks the request.
+* [ ] **Traceability:** Verify that job metadata (Start/End time, Status) is accurately recorded in Postgres.
+
+---
+
+### Layer 1: Next Steps (Post-MVP)
+* [ ] Implement **Parallel Analysis** (GPT-4o, Gemini, Perplexity).
+* [ ] Develop the **Consensus/Merge Agent** to flag disagreements.
+* [ ] Add **Gemini Search Grounding** as a second research source.
