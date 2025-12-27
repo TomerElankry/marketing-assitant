@@ -36,6 +36,19 @@ class StorageService:
             print(f"Upload failed: {e}")
             return False
 
+    def upload_file(self, key: str, file_path: str, content_type: str = 'application/octet-stream'):
+        try:
+            self.s3_client.upload_file(
+                Filename=file_path,
+                Bucket=self.bucket_name,
+                Key=key,
+                ExtraArgs={'ContentType': content_type}
+            )
+            return True
+        except ClientError as e:
+            print(f"File upload failed: {e}")
+            return False
+
     def get_json(self, key: str) -> dict:
         try:
             response = self.s3_client.get_object(Bucket=self.bucket_name, Key=key)
