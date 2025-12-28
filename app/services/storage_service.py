@@ -49,12 +49,25 @@ class StorageService:
             print(f"File upload failed: {e}")
             return False
 
+
+
     def get_json(self, key: str) -> dict:
         try:
             response = self.s3_client.get_object(Bucket=self.bucket_name, Key=key)
             return json.loads(response['Body'].read().decode('utf-8'))
         except ClientError as e:
             print(f"Download failed: {e}")
+            return None
+
+    def get_file_stream(self, key: str):
+        """
+        Returns a file stream (botocore.response.StreamingBody) for the given key.
+        """
+        try:
+            response = self.s3_client.get_object(Bucket=self.bucket_name, Key=key)
+            return response['Body']
+        except ClientError as e:
+            print(f"File stream download failed: {e}")
             return None
 
 storage_service = StorageService()

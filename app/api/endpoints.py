@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends, status, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from app.schemas.questionnaire import QuestionnaireRequest
 from app.services.gemini_service import validate_questionnaire
 from app.services.storage_service import storage_service
 from app.services.workflow import perform_research_workflow
-from app.db.session import get_db
+from app.db.session import SessionLocal, get_db
 from app.db.models import Job, JobStatus
 
 router = APIRouter()
@@ -75,3 +76,26 @@ async def create_job(
         "validation_passed": True
     }
 
+@router.get("/jobs/{job_id}/download", summary="Download Presentation")
+def download_presentation(job_id: str, db: Session = Depends(get_db)):
+    """
+    Downloads the generated PowerPoint presentation for a completed job.
+    """
+    # 1. Check if Job exists
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # 2. Check if file exists in Storage
+    pptx_key = f"jobs/{job_id}/presentation.pptx"
+    file_stream = storage_service.get_file_stream(pptx_key)
+    
+    if not file_stream:
+        raise HTTPException(status_code=404, detail="Presentation not found (or job is not complete)")
+
+    # 3. Return Streaming Response
+    return StreamingResponse(
+        file_stream,
+        media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        headers={"Content-Disposition": f'attachment; filename="marketing_strategy_{job_id}.pptx"'}
+    )
