@@ -3,7 +3,6 @@ import JobForm from './components/JobForm';
 import StatusDashboard from './components/StatusDashboard';
 import ResultsView from './components/ResultsView';
 import { Activity } from 'lucide-react';
-import type { JobResponse } from './types';
 
 function App() {
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
@@ -12,15 +11,20 @@ function App() {
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30">
 
-      {/* Header */}
-      <header className="border-b border-slate-900 bg-slate-950/50 backdrop-blur sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center gap-3">
-          <div className="p-2 bg-blue-600 rounded-lg shadow-lg shadow-blue-600/20">
-            <Activity className="text-white" size={24} />
+      {/* Glass Header */}
+      <header className="sticky top-0 z-50 border-b border-indigo-500/10 bg-slate-950/60 backdrop-blur-md shadow-lg shadow-indigo-500/5 support-[backdrop-filter]:bg-slate-950/60">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-xl shadow-lg shadow-blue-500/20">
+              <Activity className="text-white" size={24} />
+            </div>
+            <h1 className="text-2xl font-bold tracking-tight text-white">
+              Marketing<span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">Mind</span> AI
+            </h1>
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-white">
-            Marketing<span className="text-blue-500">Mind</span> AI
-          </h1>
+          <div className="text-xs font-medium px-3 py-1 rounded-full bg-slate-800/50 border border-slate-700/50 text-slate-400">
+            v1.0 MVP
+          </div>
         </div>
       </header>
 

@@ -3,10 +3,9 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import axios from 'axios';
-import { Upload, Plus, Trash2, Send, Loader2, ArrowRight, AlertCircle } from 'lucide-react';
-import type { QuestionnaireRequest } from '../types';
+import { Upload, Plus, Trash2, Send, Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
 
-// --- Zod Schema ---
+// --- Zod Schema (Same as before) ---
 const schema = z.object({
     project_metadata: z.object({
         brand_name: z.string().min(1, "Brand name is required"),
@@ -42,11 +41,18 @@ interface JobFormProps {
     onJobCreated: (jobId: string) => void;
 }
 
+const STEPS = [
+    { title: "Identity", description: "Who are you?" },
+    { title: "Market", description: "Who is it for?" },
+    { title: "Launch", description: "What is the goal?" },
+];
+
 const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [step, setStep] = useState(0);
 
-    const { register, control, handleSubmit, setValue, reset, formState: { errors } } = useForm<FormData>({
+    const { register, control, handleSubmit, trigger, reset, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(schema),
         defaultValues: {
             project_metadata: { brand_name: '', website_url: '', target_country: '', industry: '' },
@@ -57,9 +63,23 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
         }
     });
 
-    // arrays for dynamic fields
     const competitors = useFieldArray({ control, name: "market_context.main_competitors" as any });
     const channels = useFieldArray({ control, name: "the_creative_goal.specific_channels" as any });
+
+    // Validate current step before moving next
+    const nextStep = async () => {
+        let fieldsToValidate: any[] = [];
+        if (step === 0) {
+            fieldsToValidate = ["project_metadata", "product_definition"];
+        } else if (step === 1) {
+            fieldsToValidate = ["target_audience", "market_context"];
+        }
+
+        const isValid = await trigger(fieldsToValidate);
+        if (isValid) setStep((s) => s + 1);
+    };
+
+    const prevStep = () => setStep((s) => s - 1);
 
     const onSubmit = async (data: FormData) => {
         setLoading(true);
@@ -70,7 +90,6 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
                 onJobCreated(response.data.job_id);
             }
         } catch (err: any) {
-            console.error(err);
             if (axios.isAxiosError(err)) {
                 const msg = err.response?.data?.detail
                     ? JSON.stringify(err.response.data.detail)
@@ -85,204 +104,229 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
     };
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        console.log("File Upload Triggered");
         const file = e.target.files?.[0];
-        if (!file) {
-            console.log("No file selected");
-            return;
-        }
-        console.log("File selected:", file.name);
+        if (!file) return;
 
         const reader = new FileReader();
         reader.onload = (event) => {
             try {
                 const json = JSON.parse(event.target?.result as string);
-                console.log("JSON Parsed:", json);
                 if (json.project_metadata) {
                     reset(json);
                     setError(null);
+                    setStep(2); // Jump to end for review
                 } else {
-                    setError("Invalid JSON structure. Missing project_metadata?");
+                    setError("Invalid JSON structure.");
                 }
             } catch (err) {
-                console.error("JSON Parse Error:", err);
                 setError("Failed to parse JSON file.");
             }
         };
         reader.readAsText(file);
-        // Reset valid so same file can be selected again
         e.target.value = '';
     };
 
     return (
-        <div className="max-w-4xl mx-auto p-6 bg-slate-900 text-slate-100 rounded-xl shadow-2xl border border-slate-800">
-            <div className="flex justify-between items-center mb-8">
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
-                    Start New Campaign
-                </h2>
-                <div className="relative">
-                    <input
-                        type="file"
-                        accept=".json,application/json"
-                        onChange={handleFileUpload}
-                        className="hidden"
-                        id="file-upload"
-                    />
-                    <label
-                        htmlFor="file-upload"
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg cursor-pointer transition-colors text-sm font-medium border border-slate-700"
-                    >
-                        <Upload size={16} /> Import JSON
-                    </label>
-                </div>
-            </div>
+        <div className="max-w-4xl mx-auto">
+            {/* Glass Container */}
+            <div className="relative bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
 
-            {error && (
-                <div className="mb-6 p-4 bg-red-900/30 border border-red-800 text-red-200 rounded-lg">
-                    {typeof error === 'string' ? error : JSON.stringify(error)}
-                </div>
-            )}
-
-            <form onSubmit={handleSubmit(onSubmit, (errors) => console.log("Validation Errors:", errors))} className="space-y-8">
-
-                {/* Section 1: Metadata */}
-                <section className="space-y-4">
-                    <h3 className="text-lg font-semibold text-slate-300 border-b border-slate-800 pb-2">1. Project Metadata</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Input label="Brand Name" registration={register("project_metadata.brand_name")} error={errors.project_metadata?.brand_name} />
-                        <Input label="Website URL" registration={register("project_metadata.website_url")} error={errors.project_metadata?.website_url} />
-                        <Input label="Target Country" registration={register("project_metadata.target_country")} error={errors.project_metadata?.target_country} />
-                        <Input label="Industry" registration={register("project_metadata.industry")} error={errors.project_metadata?.industry} />
-                    </div>
-                </section>
-
-                {/* Section 2: Product */}
-                <section className="space-y-4">
-                    <h3 className="text-lg font-semibold text-slate-300 border-b border-slate-800 pb-2">2. Product Definition</h3>
-                    <TextArea label="Product Description" registration={register("product_definition.product_description")} error={errors.product_definition?.product_description} />
-                    <Input label="Core Problem Solved" registration={register("product_definition.core_problem_solved")} error={errors.product_definition?.core_problem_solved} />
-                    <Input label="Unique Selling Proposition" registration={register("product_definition.unique_selling_proposition")} error={errors.product_definition?.unique_selling_proposition} />
-                </section>
-
-                {/* Section 3: Audience */}
-                <section className="space-y-4">
-                    <h3 className="text-lg font-semibold text-slate-300 border-b border-slate-800 pb-2">3. Target Audience</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Input label="Demographics" registration={register("target_audience.demographics")} error={errors.target_audience?.demographics} />
-                        <Input label="Psychographics" registration={register("target_audience.psychographics")} error={errors.target_audience?.psychographics} />
-                    </div>
-                    <Input label="Cultural Nuances (Optional)" registration={register("target_audience.cultural_nuances")} />
-                </section>
-
-                {/* Section 4: Market Context */}
-                <section className="space-y-4">
-                    <h3 className="text-lg font-semibold text-slate-300 border-b border-slate-800 pb-2">4. Market Context</h3>
-
-                    <div className="space-y-2">
-                        <label className="block text-sm font-medium text-slate-400">Main Competitors</label>
-                        {competitors.fields.map((field, index) => (
-                            <div key={field.id} className="flex gap-2">
-                                <input
-                                    {...register(`market_context.main_competitors.${index}` as const)}
-                                    className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/50 outline-none"
-                                    placeholder="Competitor Name"
-                                    defaultValue={(field as any).name /* Hack for flat array */}
-                                />
-                                <button type="button" onClick={() => competitors.remove(index)} className="text-slate-500 hover:text-red-400">
-                                    <Trash2 size={18} />
-                                </button>
-                            </div>
-                        ))}
-                        <button type="button" onClick={() => competitors.append("New Competitor")} className="text-xs flex items-center gap-1 text-blue-400 hover:text-blue-300">
-                            <Plus size={14} /> Add Competitor
-                        </button>
-                        {errors.market_context?.main_competitors && <p className="text-xs text-red-400">{errors.market_context.main_competitors.message}</p>}
-                    </div>
-
-                    <Input label="Current Marketing Efforts (Optional)" registration={register("market_context.current_marketing_efforts")} />
-                    <Input label="Known Objections (Optional)" registration={register("market_context.known_customer_objections")} />
-                </section>
-
-                {/* Section 5: Goals */}
-                <section className="space-y-4">
-                    <h3 className="text-lg font-semibold text-slate-300 border-b border-slate-800 pb-2">5. Creative Goal</h3>
-                    <Input label="Primary Objective" registration={register("the_creative_goal.primary_objective")} error={errors.the_creative_goal?.primary_objective} />
-                    <Input label="Desired Tone" registration={register("the_creative_goal.desired_tone_of_voice")} error={errors.the_creative_goal?.desired_tone_of_voice} />
-
-                    <div className="space-y-2">
-                        <label className="block text-sm font-medium text-slate-400">Channels</label>
-                        {channels.fields.map((field, index) => (
-                            <div key={field.id} className="flex gap-2">
-                                <input
-                                    {...register(`the_creative_goal.specific_channels.${index}` as const)}
-                                    className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/50 outline-none"
-                                    placeholder="e.g. TikTok"
-                                    defaultValue={(field as any).name}
-                                />
-                                <button type="button" onClick={() => channels.remove(index)} className="text-slate-500 hover:text-red-400">
-                                    <Trash2 size={18} />
-                                </button>
-                            </div>
-                        ))}
-                        <button type="button" onClick={() => channels.append("New Channel")} className="text-xs flex items-center gap-1 text-blue-400 hover:text-blue-300">
-                            <Plus size={14} /> Add Channel
-                        </button>
-                        {errors.the_creative_goal?.specific_channels && <p className="text-xs text-red-400">{errors.the_creative_goal.specific_channels.message}</p>}
-                    </div>
-                </section>
-
-
-                {Object.keys(errors).length > 0 && (
-                    <div className="p-4 bg-red-500/10 border border-red-500 rounded-lg animate-pulse">
-                        <div className="flex items-center gap-2 text-red-400 font-bold mb-2">
-                            <AlertCircle size={20} />
-                            <span>Please fix the following errors:</span>
+                {/* Progress Header */}
+                <div className="bg-slate-950/50 border-b border-white/5 p-6">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                            <span className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm">
+                                {step + 1}
+                            </span>
+                            {STEPS[step].title}
+                        </h2>
+                        {/* File Upload Button */}
+                        <div className="relative group">
+                            <input type="file" accept=".json,application/json" onChange={handleFileUpload} className="hidden" id="file-upload" />
+                            <label htmlFor="file-upload" className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg cursor-pointer transition-colors text-xs font-medium border border-slate-700 text-slate-400 group-hover:text-white">
+                                <Upload size={14} /> Import JSON
+                            </label>
                         </div>
-                        <ul className="list-disc list-inside text-sm text-red-300 space-y-1">
-                            {Object.keys(errors).map((key) => (
-                                <li key={key}>
-                                    <span className="capitalize">{key.replace('_', ' ')}</span> contains errors.
-                                </li>
-                            ))}
-                        </ul>
+                    </div>
+
+                    {/* Stepper Visual */}
+                    <div className="flex gap-2">
+                        {STEPS.map((s, i) => (
+                            <div key={i} className="flex-1 h-1 rounded-full bg-slate-800 overflow-hidden">
+                                <div
+                                    className={`h-full transition-all duration-500 ease-out ${i <= step ? 'bg-blue-500' : 'bg-transparent'}`}
+                                    style={{ width: i < step ? '100%' : i === step ? '100%' : '0%' }}
+                                />
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                {error && (
+                    <div className="mx-6 mt-6 p-4 bg-red-500/10 border border-red-500/50 text-red-200 rounded-lg text-sm">
+                        {error}
                     </div>
                 )}
 
-                <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full flex justify-center items-center gap-2 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    {loading ? <Loader2 className="animate-spin" /> : <Send size={18} />}
-                    {loading ? "Analyzing..." : "Launch Campaign Analysis"}
-                </button>
+                <form onSubmit={handleSubmit(onSubmit)} className="p-6 md:p-8 animate-fadeIn">
 
-            </form>
+                    {/* Step 1: Identity & Product */}
+                    {step === 0 && (
+                        <div className="space-y-6 animate-slideUp">
+                            <section className="space-y-4">
+                                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Project Identity</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <Input label="Brand Name" registration={register("project_metadata.brand_name")} error={errors.project_metadata?.brand_name} placeholder="Acme Corp" />
+                                    <Input label="Website URL" registration={register("project_metadata.website_url")} error={errors.project_metadata?.website_url} placeholder="https://acme.com" />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <Input label="Target Country" registration={register("project_metadata.target_country")} error={errors.project_metadata?.target_country} placeholder="United States" />
+                                    <Input label="Industry" registration={register("project_metadata.industry")} error={errors.project_metadata?.industry} placeholder="SaaS / E-commerce" />
+                                </div>
+                            </section>
+
+                            <section className="space-y-4">
+                                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Product</h3>
+                                <TextArea label="Product Description" registration={register("product_definition.product_description")} error={errors.product_definition?.product_description} placeholder="Describe what you are selling in detail..." />
+                                <Input label="Core Problem Solved" registration={register("product_definition.core_problem_solved")} error={errors.product_definition?.core_problem_solved} />
+                                <Input label="Unique Selling Proposition" registration={register("product_definition.unique_selling_proposition")} error={errors.product_definition?.unique_selling_proposition} />
+                            </section>
+                        </div>
+                    )}
+
+                    {/* Step 2: Audience & Market */}
+                    {step === 1 && (
+                        <div className="space-y-6 animate-slideUp">
+                            <section className="space-y-4">
+                                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Target Audience</h3>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <Input label="Demographics" registration={register("target_audience.demographics")} error={errors.target_audience?.demographics} placeholder="Age 25-40, Urban professionals" />
+                                    <Input label="Psychographics" registration={register("target_audience.psychographics")} error={errors.target_audience?.psychographics} placeholder="Ambitious, tech-savvy, values time" />
+                                </div>
+                                <Input label="Cultural Nuances (Optional)" registration={register("target_audience.cultural_nuances")} />
+                            </section>
+
+                            <section className="space-y-4">
+                                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Competition</h3>
+                                <div className="space-y-2">
+                                    <label className="block text-xs font-medium text-slate-400">Main Competitors</label>
+                                    {competitors.fields.map((field, index) => (
+                                        <div key={field.id} className="flex gap-2">
+                                            <input
+                                                {...register(`market_context.main_competitors.${index}` as const)}
+                                                className="flex-1 bg-slate-950/50 border border-slate-700/50 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-200"
+                                                placeholder="Competitor Name"
+                                                defaultValue={(field as any).name}
+                                            />
+                                            <button type="button" onClick={() => competitors.remove(index)} className="text-slate-500 hover:text-red-400">
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button type="button" onClick={() => competitors.append("New Competitor")} className="text-xs flex items-center gap-1 text-blue-400 hover:text-blue-300">
+                                        <Plus size={14} /> Add Competitor
+                                    </button>
+                                    {errors.market_context?.main_competitors && <p className="text-xs text-red-400 mt-1">{errors.market_context.main_competitors.message}</p>}
+                                </div>
+                            </section>
+                        </div>
+                    )}
+
+                    {/* Step 3: Goals */}
+                    {step === 2 && (
+                        <div className="space-y-6 animate-slideUp">
+                            <section className="space-y-4">
+                                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Campaign Goals</h3>
+                                <Input label="Primary Objective" registration={register("the_creative_goal.primary_objective")} error={errors.the_creative_goal?.primary_objective} placeholder="Brand Awareness / Lead Gen" />
+                                <Input label="Desired Tone" registration={register("the_creative_goal.desired_tone_of_voice")} error={errors.the_creative_goal?.desired_tone_of_voice} placeholder="Professional, Witty, Urgent" />
+
+                                <div className="space-y-2">
+                                    <label className="block text-xs font-medium text-slate-400">Channels</label>
+                                    {channels.fields.map((field, index) => (
+                                        <div key={field.id} className="flex gap-2">
+                                            <input
+                                                {...register(`the_creative_goal.specific_channels.${index}` as const)}
+                                                className="flex-1 bg-slate-950/50 border border-slate-700/50 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-200"
+                                                placeholder="e.g. LinkedIn"
+                                                defaultValue={(field as any).name}
+                                            />
+                                            <button type="button" onClick={() => channels.remove(index)} className="text-slate-500 hover:text-red-400">
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                    <button type="button" onClick={() => channels.append("New Channel")} className="text-xs flex items-center gap-1 text-blue-400 hover:text-blue-300">
+                                        <Plus size={14} /> Add Channel
+                                    </button>
+                                    {errors.the_creative_goal?.specific_channels && <p className="text-xs text-red-400 mt-1">{errors.the_creative_goal.specific_channels.message}</p>}
+                                </div>
+                            </section>
+                        </div>
+                    )}
+
+                    {/* Navigation Buttons */}
+                    <div className="flex justify-between items-center mt-10 pt-6 border-t border-white/5">
+                        {step > 0 ? (
+                            <button
+                                type="button"
+                                onClick={prevStep}
+                                className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-white transition-colors"
+                            >
+                                <ArrowLeft size={16} /> Back
+                            </button>
+                        ) : (
+                            <div></div>
+                        )}
+
+                        {step < STEPS.length - 1 ? (
+                            <button
+                                type="button"
+                                onClick={nextStep}
+                                className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg shadow-lg shadow-blue-900/20 transition-all hover:scale-105"
+                            >
+                                Next Step <ArrowRight size={16} />
+                            </button>
+                        ) : (
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="flex items-center gap-2 px-8 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg shadow-lg shadow-emerald-900/20 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {loading ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
+                                {loading ? "Launching Agents..." : "Launch Campaign"}
+                            </button>
+                        )}
+                    </div>
+
+                </form>
+            </div>
         </div>
     );
 };
 
-// UI Helper Components
-const Input = ({ label, registration, error }: any) => (
-    <div className="space-y-1">
-        <label className="block text-sm font-medium text-slate-400">{label}</label>
+// UI Helper Components (Styled for Dark Mode)
+const Input = ({ label, registration, error, placeholder }: any) => (
+    <div className="space-y-1.5">
+        <label className="block text-xs font-medium text-slate-400">{label}</label>
         <input
             {...registration}
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/50 outline-none transition-all placeholder-slate-700"
+            placeholder={placeholder}
+            className="w-full bg-slate-950/50 border border-slate-700/50 rounded-lg px-3 py-2.5 text-sm md:text-base focus:ring-2 focus:ring-blue-500/50 outline-none transition-all placeholder-slate-700 text-slate-200"
         />
-        {error && <p className="text-xs text-red-400">{error.message}</p>}
+        {error && <p className="text-xs text-red-400 animate-fadeIn">{error.message}</p>}
     </div>
 );
 
-const TextArea = ({ label, registration, error }: any) => (
-    <div className="space-y-1">
-        <label className="block text-sm font-medium text-slate-400">{label}</label>
+const TextArea = ({ label, registration, error, placeholder }: any) => (
+    <div className="space-y-1.5">
+        <label className="block text-xs font-medium text-slate-400">{label}</label>
         <textarea
             {...registration}
             rows={3}
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/50 outline-none transition-all placeholder-slate-700 resize-none"
+            placeholder={placeholder}
+            className="w-full bg-slate-950/50 border border-slate-700/50 rounded-lg px-3 py-2.5 text-sm md:text-base focus:ring-2 focus:ring-blue-500/50 outline-none transition-all placeholder-slate-700 resize-none text-slate-200"
         />
-        {error && <p className="text-xs text-red-400">{error.message}</p>}
+        {error && <p className="text-xs text-red-400 animate-fadeIn">{error.message}</p>}
     </div>
 );
 
