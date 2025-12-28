@@ -12,7 +12,18 @@ Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
-app.include_router(endpoints.router, prefix="/api/v1")
+# Exception Handler for Validation
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+import logging
+logger = logging.getLogger(__name__)
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    logger.error(f"Validation Error: {exc.errors()}")
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
+
+app.include_router(endpoints.router, prefix="/api")
 
 @app.get("/")
 def read_root():

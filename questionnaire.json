@@ -1,28 +1,36 @@
 {
-    "project_metadata": {
-      "brand_name": "string",
-      "website_url": "string (url)",
-      "target_country": "string (e.g., USA, Israel)",
-      "industry": "string"
-    },
-    "product_definition": {
-      "product_description": "string (What are you selling?)",
-      "core_problem_solved": "string (What pain point does it address?)",
-      "unique_selling_proposition": "string (Why are you different?)"
-    },
-    "target_audience": {
-      "demographics": "string (Age, gender, location)",
-      "psychographics": "string (Interests, values, behavior)",
-      "cultural_nuances": "string (Any specific cultural taboos or preferences?)"
-    },
-    "market_context": {
-      "main_competitors": ["string (List of 3-5 competitors)"],
-      "current_marketing_efforts": "string (What are you doing now?)",
-      "known_customer_objections": "string (Why do people say 'no' to you?)"
-    },
-    "the_creative_goal": {
-      "primary_objective": "string (e.g., Awareness, Rebranding, New Launch)",
-      "desired_tone_of_voice": "string (e.g., Bold, Professional, Humorous)",
-      "specific_channels": ["string (e.g., TikTok, LinkedIn, Meta)"]
-    }
+  "project_metadata": {
+    "brand_name": "EcoFlow Bottles",
+    "website_url": "https://ecoflowbottles.com",
+    "target_country": "United States",
+    "industry": "Consumer Goods / Sustainability"
+  },
+  "product_definition": {
+    "product_description": "A self-cleaning, insulated water bottle that uses UV-C light to purify water and neutralize bacteria every 2 hours.",
+    "core_problem_solved": "Reusable bottles getting smelly and moldy; need for clean water on the go.",
+    "unique_selling_proposition": "The only bottle that cleans itself and your water remotely via app integration."
+  },
+  "target_audience": {
+    "demographics": "Millennials and Gen Z (ages 22-35), urban dwellers, working professionals.",
+    "psychographics": "Health-conscious, environmentally aware, tech-savvy, values convenience and aesthetics.",
+    "cultural_nuances": "High value on transparency and sustainability; tired of 'greenwashing'."
+  },
+  "market_context": {
+    "main_competitors": [
+      "LARQ",
+      "Hydro Flask",
+      "Swell"
+    ],
+    "current_marketing_efforts": "Instagram ads focusing on design; influencer partnerships.",
+    "known_customer_objections": "Price is too high ($95); skepticism about UV technology effectiveness."
+  },
+  "the_creative_goal": {
+    "primary_objective": "Increase brand awareness and drive pre-orders for the new 'Pro' model.",
+    "desired_tone_of_voice": "Innovative, Premium, Trustworthy, yet Playful.",
+    "specific_channels": [
+      "Instagram Reels",
+      "TikTok",
+      "YouTube Reviews"
+    ]
   }
+}

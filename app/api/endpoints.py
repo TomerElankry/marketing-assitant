@@ -99,3 +99,40 @@ def download_presentation(job_id: str, db: Session = Depends(get_db)):
         media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
         headers={"Content-Disposition": f'attachment; filename="marketing_strategy_{job_id}.pptx"'}
     )
+
+@router.get("/jobs/{job_id}", summary="Get Job Status")
+def get_job_status(job_id: str, db: Session = Depends(get_db)):
+    """
+    Returns the current status and metadata for a specific job.
+    """
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    return {
+        "job_id": job.id,
+        "status": job.status,
+        "created_at": job.created_at,
+        "created_at": job.created_at,
+        "updated_at": job.updated_at,
+        "brand_name": job.project_metadata.get("brand_name")
+    }
+
+@router.get("/jobs/{job_id}/analysis", summary="Get Analysis Results")
+def get_job_analysis(job_id: str, db: Session = Depends(get_db)):
+    """
+    Retrieves the generated analysis JSON (Hooks, Angles, etc.)
+    """
+    # Check Job
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    # Get JSON from Storage
+    analysis_key = f"jobs/{job_id}/analysis.json"
+    data = storage_service.get_json(analysis_key)
+    
+    if not data:
+        raise HTTPException(status_code=404, detail="Analysis content not found")
+        
+    return data
