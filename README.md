@@ -1,21 +1,22 @@
-# Marketing Strategy AI Agent (MVP) 🚀
+# Marketing Strategy AI Agent 🚀
 
 A powerful, agentic AI system that autonomously conducts deep market research, generates strategic marketing angles, and produces ready-to-use PowerPoint presentations.
 
 ## 🎯 What It Does
-1.  **Ingests Brand Info**: Takes a detailed questionnaire about a brand or product.
+1.  **Ingests Brand Info**: Takes a detailed questionnaire about a brand or product through an intuitive multi-step form.
 2.  **Validates Input (Gemini)**: Ensures the input is sufficient and meaningful using `google-generativeai`.
 3.  **Deep Research (Perplexity)**: Conducts live web research on competitors, social sentiment, and market trends.
 4.  **Strategic Analysis (GPT-4o)**: Synthesizes research into unique "Hooks", "Angles", and a "Creative Pivot".
 5.  **Generates Presentation**: Structures a 7-slide deck and builds a `.pptx` file using `python-pptx`.
-6.  **Interactive UI**: Provides a modern React interface to submit jobs, track real-time progress, and download results.
+6.  **Interactive UI**: Provides a modern React interface with real-time progress tracking and downloadable results.
 
 ## 🏗 Architecture
-*   **Backend**: FastAPI (Python), SQLAlchemy (Postgres)
-*   **Frontend**: React, Vite, Tailwind CSS, TypeScript
+*   **Backend**: FastAPI (Python 3.12+), SQLAlchemy (Postgres)
+*   **Frontend**: React 19, Vite, Tailwind CSS, TypeScript
 *   **Storage**: MinIO (S3-compatible) for JSON artifacts and PPTX files
+*   **Database**: PostgreSQL for job tracking and metadata
 *   **AI Models**:
-    *   **Gemini 1.5 Flash**: Validation Agent
+    *   **Gemini 2.0 Flash**: Validation Agent
     *   **Perplexity (Sonar)**: Research Agent
     *   **GPT-4o**: Analysis & Presentation Agent
 
@@ -24,9 +25,15 @@ A powerful, agentic AI system that autonomously conducts deep market research, g
 ### Prerequisites
 *   Python 3.12+
 *   Node.js 18+
-*   Docker (for Postgres/MinIO)
+*   Docker & Docker Compose (for Postgres/MinIO)
 
-### 1. Setup Environment
+### 1. Clone Repository
+```bash
+git clone https://github.com/TomerElankry/marketing-assitant.git
+cd marketing-assitant
+```
+
+### 2. Setup Environment
 Create a `.env` file in the root:
 ```env
 # Database
@@ -37,44 +44,159 @@ MINIO_ENDPOINT=localhost:9000
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
 
-# AI Keys
+# AI Keys (Required)
 GEMINI_API_KEY=your_gemini_key
 PERPLEXITY_API_KEY=your_perplexity_key
 OPENAI_API_KEY=your_openai_key
 ```
 
-### 2. Run Infrastructure
+### 3. Run Infrastructure
+Start PostgreSQL and MinIO services:
 ```bash
 docker-compose up -d
 ```
 
-### 3. Run Backend
+This will start:
+- **PostgreSQL** on port `5432`
+- **MinIO** API on port `9000` and Console on port `9001`
+
+### 4. Install Backend Dependencies
 ```bash
-# Install dependencies
 pip install -r requirements.txt
-
-# Start API Server
-uvicorn app.main:app --reload
 ```
-The API will be available at `http://localhost:8000`.
 
-### 4. Run Frontend
+### 5. Start Backend Server
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+The API will be available at:
+- API: `http://localhost:8000`
+- Docs: `http://localhost:8000/docs` (Swagger UI)
+- Health: `http://localhost:8000/health`
+
+### 6. Install Frontend Dependencies
 ```bash
 cd frontend
 npm install
+```
+
+### 7. Start Frontend Development Server
+```bash
 npm run dev
 ```
 The UI will be available at `http://localhost:5173`.
 
+## 🚀 Usage
+
+1. **Fill Out Questionnaire**: Navigate to the web UI and complete the multi-step form with:
+   - Brand/project metadata
+   - Product definition and USP
+   - Target audience demographics
+   - Market context and competitors
+   - Creative goals and channels
+
+2. **Submit & Track**: Submit the form and watch real-time progress as AI agents:
+   - Validate your input
+   - Research competitors and market sentiment
+   - Generate strategic insights
+   - Create your presentation
+
+3. **Download Results**: Once complete, download your professional PowerPoint presentation.
+
 ## 🧪 Testing
-The project includes a suite of test scripts in the root and `test/` directory to verify each component:
-*   `test_research.py`: Verifies Perplexity integration.
+The project includes a comprehensive test suite in the `test/` directory:
+*   `test_research.py`: Verifies Perplexity integration and web research.
 *   `test_analysis.py`: Verifies GPT-4o strategy generation.
-*   `test_pptx_generation.py`: Verifies slide creation.
+*   `test_pptx_generation.py`: Verifies PowerPoint slide creation.
+*   `test_presentation_structure.py`: Tests slide structure generation.
 *   `test_full_workflow.py`: Runs the entire pipeline end-to-end.
+*   `test_storage.py`: Tests MinIO storage operations.
+*   `test_validation.py`: Tests Gemini validation agent.
+
+Run tests individually:
+```bash
+python test/test_research.py
+python test/test_full_workflow.py
+```
 
 ## 📂 Project Structure
-*   `app/api`: FastAPI endpoints (`/jobs`, `/download`).
-*   `app/services`: Core logic (`research_service`, `analysis_service`, `presentation_service`).
-*   `app/db`: Database models and session management.
-*   `frontend/`: React application.
+```
+marketing-assistant2/
+├── app/
+│   ├── api/              # FastAPI endpoints
+│   │   └── endpoints.py  # /jobs, /validate, /download
+│   ├── core/             # Configuration
+│   ├── db/               # Database models and sessions
+│   ├── schemas/          # Pydantic models
+│   ├── services/         # Core business logic
+│   │   ├── research_service.py
+│   │   ├── analysis_service.py
+│   │   ├── presentation_service.py
+│   │   ├── storage_service.py
+│   │   ├── gemini_service.py
+│   │   └── workflow.py
+│   └── main.py           # FastAPI application
+├── frontend/             # React application
+│   ├── src/
+│   │   ├── components/  # React components
+│   │   └── App.tsx       # Main app component
+│   └── package.json
+├── test/                 # Test scripts
+├── docs/                 # Documentation (PRD, architecture)
+├── docker-compose.yml    # Infrastructure setup
+└── requirements.txt     # Python dependencies
+```
+
+## 🔄 Workflow
+
+The system follows this automated pipeline:
+
+1. **Validation** → Gemini validates questionnaire quality
+2. **Research** → Perplexity conducts web research (competitors, sentiment)
+3. **Analysis** → GPT-4o generates marketing strategy (hooks, angles, pivot)
+4. **Structuring** → GPT-4o structures content into 7 slides
+5. **Generation** → Python-pptx creates PowerPoint file
+6. **Storage** → Files saved to MinIO, metadata to PostgreSQL
+
+## 📋 API Endpoints
+
+- `POST /api/validate` - Validate questionnaire input
+- `POST /api/jobs` - Submit a new marketing strategy job
+- `GET /api/jobs/{job_id}` - Get job status
+- `GET /api/jobs/{job_id}/analysis` - Get analysis results (JSON)
+- `GET /api/jobs/{job_id}/download` - Download PowerPoint presentation
+
+## 🌿 Branches
+
+- **`main`**: Active development branch (current)
+- **`mvp`**: Preserved MVP snapshot for reference
+
+## 🛠 Tech Stack
+
+**Backend:**
+- FastAPI - Modern Python web framework
+- SQLAlchemy - ORM for database operations
+- Pydantic - Data validation
+- python-pptx - PowerPoint generation
+- boto3 - S3/MinIO client
+
+**Frontend:**
+- React 19 - UI library
+- TypeScript - Type safety
+- Vite - Build tool
+- Tailwind CSS - Styling
+- React Hook Form - Form management
+- TanStack Query - Data fetching
+
+**Infrastructure:**
+- PostgreSQL - Relational database
+- MinIO - S3-compatible object storage
+- Docker - Containerization
+
+## 📝 License
+
+This project is private and proprietary.
+
+## 🤝 Contributing
+
+This is a private project. For questions or contributions, please contact the repository owner.
