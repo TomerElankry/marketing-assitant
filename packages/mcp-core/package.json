@@ -1,0 +1,19 @@
+{
+    "name": "@marketing-assistant/mcp-core",
+    "version": "0.0.1",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc -w",
+        "lint": "eslint src/**/*.ts"
+    },
+    "dependencies": {
+        "@marketing-assistant/schemas": "*",
+        "@marketing-assistant/bus": "*",
+        "zod": "^3.22.0"
+    },
+    "devDependencies": {
+        "typescript": "^5.0.0"
+    }
+}
