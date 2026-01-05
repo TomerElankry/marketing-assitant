@@ -5,10 +5,17 @@ A powerful, agentic AI system that autonomously conducts deep market research, g
 ## 🎯 What It Does
 1.  **Ingests Brand Info**: Takes a detailed questionnaire about a brand or product through an intuitive multi-step form.
 2.  **Validates Input (Gemini)**: Ensures the input is sufficient and meaningful using `google-generativeai`.
-3.  **Deep Research (Perplexity)**: Conducts live web research on competitors, social sentiment, and market trends.
-4.  **Strategic Analysis (GPT-4o)**: Synthesizes research into unique "Hooks", "Angles", and a "Creative Pivot".
-5.  **Generates Presentation**: Structures a 7-slide deck and builds a `.pptx` file using `python-pptx`.
-6.  **Interactive UI**: Provides a modern React interface with real-time progress tracking and downloadable results.
+3.  **Dual-Source Research**:
+    *   **Market Data (Perplexity)**: Competitor analysis, pricing, and social sentiment ("The Talk").
+    *   **Creative Trends (Gemini)**: Visual trends, cultural insights, and campaign examples.
+4.  **Consolidated Intelligence**: An AI agent merges these two research streams into a single strategic resource.
+5.  **Triple Analysis**: Three distinct AI personas analyze the data in parallel to find the best strategy:
+    *   **Creative Director (GPT-4o)**: Focuses on hooks, narrative, and bold pivots.
+    *   **Brand Strategist (Gemini)**: Focuses on positioning and long-term brand health.
+    *   **Market Analyst (Perplexity)**: Focuses on data, gaps, and competitor weaknesses.
+6.  **Consensus Engine**: A "Chief Strategy Officer" agent synthesizes the three proposals into a final **Consensus Strategy**, resolving conflicts and picking the best ideas.
+7.  **Generates Presentation**: Structures a deck and builds a `.pptx` file with custom layouts and your logo.
+8.  **Interactive UI**: Provides a modern React interface with real-time progress tracking of the entire multi-agent workflow.
 
 ## 🏗 Architecture
 *   **Backend**: FastAPI (Python 3.12+), SQLAlchemy (Postgres)
@@ -16,9 +23,9 @@ A powerful, agentic AI system that autonomously conducts deep market research, g
 *   **Storage**: MinIO (S3-compatible) for JSON artifacts and PPTX files
 *   **Database**: PostgreSQL for job tracking and metadata
 *   **AI Models**:
-    *   **Gemini 2.0 Flash**: Validation Agent
-    *   **Perplexity (Sonar)**: Research Agent
-    *   **GPT-4o**: Analysis & Presentation Agent
+    *   **Gemini 2.0 Flash**: Validation, Creative Research, Brand Strategy
+    *   **Perplexity (Sonar-Pro)**: Market Research, Market Analysis
+    *   **GPT-4o**: Creative Direction, Consensus Generation, Presentation Structuring
 
 ## ⚡ Quick Start
 
@@ -96,27 +103,30 @@ The UI will be available at `http://localhost:5173`.
    - Creative goals and channels
 
 2. **Submit & Track**: Submit the form and watch real-time progress as AI agents:
-   - Validate your input
-   - Research competitors and market sentiment
-   - Generate strategic insights
-   - Create your presentation
+   - **Validate** your input
+   - **Research** (Dual Source: Perplexity + Gemini)
+   - **Analyze** (Triple Analysis: GPT-4o, Gemini, Perplexity)
+   - **Consolidate** findings into a Consensus Strategy
+   - **Generate** your presentation
 
 3. **Download Results**: Once complete, download your professional PowerPoint presentation.
 
 ## 🧪 Testing
 The project includes a comprehensive test suite in the `test/` directory:
+*   `test_phase2_workflow.py`: Verifies the full Dual Research -> Triple Analysis -> Consensus pipeline.
 *   `test_research.py`: Verifies Perplexity integration and web research.
 *   `test_analysis.py`: Verifies GPT-4o strategy generation.
 *   `test_pptx_generation.py`: Verifies PowerPoint slide creation.
+*   `test_logo_integration.py`: Verifies custom logo placement.
 *   `test_presentation_structure.py`: Tests slide structure generation.
-*   `test_full_workflow.py`: Runs the entire pipeline end-to-end.
+*   `test_full_workflow.py`: Runs the legacy pipeline end-to-end.
 *   `test_storage.py`: Tests MinIO storage operations.
 *   `test_validation.py`: Tests Gemini validation agent.
 
 Run tests individually:
 ```bash
-python test/test_research.py
-python test/test_full_workflow.py
+python test/test_phase2_workflow.py
+python test/test_logo_integration.py
 ```
 
 ## 📂 Project Structure
@@ -125,16 +135,21 @@ marketing-assistant2/
 ├── app/
 │   ├── api/              # FastAPI endpoints
 │   │   └── endpoints.py  # /jobs, /validate, /download
+│   ├── assets/           # Static assets (logos, images)
 │   ├── core/             # Configuration
 │   ├── db/               # Database models and sessions
 │   ├── schemas/          # Pydantic models
 │   ├── services/         # Core business logic
-│   │   ├── research_service.py
-│   │   ├── analysis_service.py
-│   │   ├── presentation_service.py
-│   │   ├── storage_service.py
-│   │   ├── gemini_service.py
-│   │   └── workflow.py
+│   │   ├── research_service.py       # Perplexity Research
+│   │   ├── gemini_research_service.py # Gemini Research
+│   │   ├── research_consolidator.py  # Research Synthesis
+│   │   ├── multi_analysis_service.py # Triple Analysis Engine
+│   │   ├── consensus_service.py      # Consensus Engine
+│   │   ├── analysis_service.py       # Legacy Analysis
+│   │   ├── presentation_service.py   # PPTX Generation
+│   │   ├── storage_service.py        # MinIO Storage
+│   │   ├── gemini_service.py         # Validation
+│   │   └── workflow.py               # Orchestrator
 │   └── main.py           # FastAPI application
 ├── frontend/             # React application
 │   ├── src/
@@ -152,11 +167,13 @@ marketing-assistant2/
 The system follows this automated pipeline:
 
 1. **Validation** → Gemini validates questionnaire quality
-2. **Research** → Perplexity conducts web research (competitors, sentiment)
-3. **Analysis** → GPT-4o generates marketing strategy (hooks, angles, pivot)
-4. **Structuring** → GPT-4o structures content into 7 slides
-5. **Generation** → Python-pptx creates PowerPoint file
-6. **Storage** → Files saved to MinIO, metadata to PostgreSQL
+2. **Dual Research** → Perplexity (Market) + Gemini (Creative) run in parallel
+3. **Consolidation** → AI merges findings into a single resource
+4. **Triple Analysis** → GPT-4o + Gemini + Perplexity analyze data in parallel
+5. **Consensus** → "Chief Strategy Officer" agent synthesizes a final strategy
+6. **Structuring** → GPT-4o structures content into slides based on Consensus
+7. **Generation** → Python-pptx creates PowerPoint file with logo
+8. **Storage** → Files saved to MinIO, metadata to PostgreSQL
 
 ## 📋 API Endpoints
 
