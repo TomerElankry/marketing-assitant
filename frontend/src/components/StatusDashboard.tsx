@@ -33,8 +33,9 @@ const StatusDashboard: React.FC<StatusDashboardProps> = ({ jobId, onComplete }) 
     const getProgress = (status: string) => {
         switch (status) {
             case 'pending': return 10;
-            case 'researching': return 40;
-            case 'analyzing': return 70;
+            case 'researching': return 30;
+            case 'analyzing': return 60;
+            case 'consensus': return 85;
             case 'completed': return 100;
             default: return 5;
         }
@@ -109,22 +110,28 @@ const StatusDashboard: React.FC<StatusDashboardProps> = ({ jobId, onComplete }) 
                                 <span>Initializing AI agents swarm...</span>
                             </div>
                         )}
-                        {progress >= 40 && (
+                        {progress >= 30 && (
                             <div className="flex items-center gap-2 animate-fadeIn">
                                 <span className="text-blue-500">➜</span>
-                                <span>Running Perplexity Research (Competitors, USP)...</span>
+                                <span>Running Dual Research (Perplexity + Gemini)...</span>
                             </div>
                         )}
-                        {progress >= 70 && (
+                        {progress >= 60 && (
                             <div className="flex items-center gap-2 animate-fadeIn">
                                 <span className="text-purple-500">➜</span>
-                                <span>Generating GPT-4o Insights & Strategy...</span>
+                                <span>Triple Analysis (GPT-4o, Gemini, Perplexity)...</span>
                             </div>
                         )}
-                        {progress >= 90 && (
+                        {progress >= 85 && (
+                            <div className="flex items-center gap-2 animate-fadeIn">
+                                <span className="text-yellow-500">➜</span>
+                                <span>Generating Consensus Strategy...</span>
+                            </div>
+                        )}
+                        {progress >= 95 && (
                             <div className="flex items-center gap-2 animate-fadeIn text-emerald-400">
                                 <span className="text-emerald-500">➜</span>
-                                <span>Finalizing Presentation logic...</span>
+                                <span>Finalizing Presentation...</span>
                             </div>
                         )}
                     </div>

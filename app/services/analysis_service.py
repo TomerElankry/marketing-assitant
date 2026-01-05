@@ -19,8 +19,9 @@ class AnalysisService:
 
         # 2. Construct System Prompt
         system_prompt = (
-            "You are a world-class Marketing Strategist for major consumer brands. "
-            "Your goal is to synthesize raw research data into a winning strategy.\n"
+            "You are a world-class Creative Director & Brand Strategist. "
+            "Your goal is to find the 'Creative Pivot' and synthesize raw research data into a bold, insight-driven strategy. "
+            "Focus on emotional triggers, visual storytelling, and distinct brand voice.\n"
             "Output must be valid JSON."
         )
 
@@ -37,9 +38,26 @@ class AnalysisService:
 
         # Task
         Based on the above, generate a strategy with the following structure:
-        1. "hooks": List of 3 powerful marketing hooks (1 sentence each).
-        2. "angles": List of 2 creative angles (title + description).
-        3. "creative_pivot": A strategic recommendation on how to stand out from the competitors found in research.
+        1. "hooks": List of 5 distinct creative hooks. Each item should be an object with:
+           - "hook": The hook text (1 sentence).
+           - "type": One of "Emotional", "Problem-Solution", "Aspirational", "Contrarian".
+        2. "angles": List of 3 unique creative angles. Each item should be an object with:
+           - "title": Angle title.
+           - "description": Description of the angle.
+           - "visual_idea": A brief visual concept for this angle.
+        3. "creative_pivot": A bold strategic recommendation on how to break the pattern of the current market and stand out.
+        4. "visual_concepts": List of 3 visual directions. Each item with:
+           - "concept_name": Name of the visual concept.
+           - "description": Detailed description.
+           - "style_reference": e.g., "Minimalist High-Contrast", "UGC-style Authentic".
+        5. "brand_voice": Object defining the recommended brand voice:
+           - "tone": String (adjectives).
+           - "keywords": List of 3-5 keywords.
+           - "guidelines": List of short Dos/Donts.
+        6. "campaign_concepts": List of 2 high-level campaign concepts. Each with:
+           - "name": Campaign name.
+           - "tagline": Campaign tagline.
+           - "narrative": Short story/narrative.
         
         Return ONLY valid JSON.
         """

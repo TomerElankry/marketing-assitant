@@ -12,7 +12,7 @@ class ResearchService:
             "Content-Type": "application/json"
         }
         # Using a reliable online model
-        self.model = "sonar" 
+        self.model = "sonar-pro" 
 
     async def _search(self, query: str) -> str:
         """
@@ -23,7 +23,7 @@ class ResearchService:
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are a professional market researcher. Provide detailed, factual, and cited summaries based on the search query. Focus on recent data (last 6 months)."
+                    "content": "You are a professional market researcher and creative strategist. Provide detailed, factual, and cited summaries based on the search query. Focus on recent data (last 6 months), visual trends, and cultural nuances."
                 },
                 {
                     "role": "user",
@@ -53,13 +53,21 @@ class ResearchService:
         """
         brand = data.project_metadata.brand_name
         industry = data.project_metadata.industry
+        country = data.project_metadata.target_country
         competitors = ", ".join(data.market_context.main_competitors)
         usp = data.product_definition.unique_selling_proposition
         
         return {
             "competitor_analysis": f"Analyze the current pricing, marketing messaging, and customer sentiment for these competitors in the {industry} space: {competitors}. Highlight their weaknesses.",
             "usp_validation": f"Search for consumer discussions and reviews regarding {industry} to interpret if this value proposition is truly unique or desired: '{usp}'. Are customers asking for this?",
-            "social_sentiment": f"Search Reddit and social threads for recent 'talk' or honest opinions about '{brand}' (if existing) or general frustrations with current solutions in the {industry} market."
+            "social_sentiment": f"Search Reddit and social threads for recent 'talk' or honest opinions about '{brand}' (if existing) or general frustrations with current solutions in the {industry} market.",
+            
+            # Creative Focus Queries
+            "visual_trends": f"What are the dominant visual styles, color palettes, and imagery trends used by top competitors in the {industry} industry in {country}? Describe specific ad creatives.",
+            "emotional_triggers": f"What emotional triggers and psychological hooks are most effective in recent successful marketing campaigns for {industry} products in {country}?",
+            "creative_formats": f"What creative formats (e.g., UGC, short-form video, static carousels) are trending and performing best for {industry} marketing on social media in {country}?",
+            "brand_voice": f"Analyze the tone of voice and brand personality of the top {industry} brands ({competitors}). How do they speak to their audience?",
+            "cultural_trends": f"What are the emerging cultural trends or consumer behaviors in {country} that are impacting the {industry} market right now?"
         }
 
     async def conduct_deep_research(self, data: QuestionnaireRequest) -> dict:

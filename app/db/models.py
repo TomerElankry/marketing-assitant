@@ -10,6 +10,7 @@ class JobStatus(str, enum.Enum):
     APPROVED = "approved"
     RESEARCHING = "researching"
     ANALYZING = "analyzing"
+    CONSENSUS = "consensus"
     COMPLETED = "completed"
     FAILED = "failed"
 

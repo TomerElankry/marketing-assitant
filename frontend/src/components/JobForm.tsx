@@ -85,18 +85,44 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
         setLoading(true);
         setError(null);
         try {
-            const response = await axios.post('/api/jobs', data);
+            console.log('Submitting job with data:', data);
+            const response = await axios.post('/api/jobs', data, {
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+            console.log('Response received:', response.status, response.data);
             if (response.status === 201) {
                 onJobCreated(response.data.job_id);
             }
         } catch (err: any) {
+            console.error('Error submitting job:', err);
             if (axios.isAxiosError(err)) {
-                const msg = err.response?.data?.detail
-                    ? JSON.stringify(err.response.data.detail)
-                    : err.message;
-                setError(msg);
+                console.error('Axios error details:', {
+                    status: err.response?.status,
+                    statusText: err.response?.statusText,
+                    data: err.response?.data,
+                    url: err.config?.url,
+                });
+                
+                if (err.response?.status === 404) {
+                    setError(`404 Not Found: ${err.config?.url}. Make sure the backend is running on port 8000.`);
+                } else if (err.response?.status === 400) {
+                    // Validation error from backend
+                    const detail = err.response.data?.detail;
+                    if (detail && typeof detail === 'object' && 'feedback' in detail) {
+                        setError(`Validation failed: ${Array.isArray(detail.feedback) ? detail.feedback.join(' ') : JSON.stringify(detail)}`);
+                    } else {
+                        setError(`Validation error: ${JSON.stringify(detail || err.response.data)}`);
+                    }
+                } else {
+                    const msg = err.response?.data?.detail
+                        ? JSON.stringify(err.response.data.detail)
+                        : err.message || `Request failed with status code ${err.response?.status || 'unknown'}`;
+                    setError(msg);
+                }
             } else {
-                setError("Network error. Is the backend running?");
+                setError(`Network error: ${err.message || 'Unknown error'}. Is the backend running?`);
             }
         } finally {
             setLoading(false);
@@ -105,25 +131,48 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file) return;
+        if (!file) {
+            setError("No file selected.");
+            return;
+        }
+
+        // Check file type
+        if (!file.name.endsWith('.json') && file.type !== 'application/json') {
+            setError("Please select a JSON file.");
+            e.target.value = '';
+            return;
+        }
 
         const reader = new FileReader();
+        reader.onerror = () => {
+            setError("Failed to read file.");
+            e.target.value = '';
+        };
         reader.onload = (event) => {
             try {
-                const json = JSON.parse(event.target?.result as string);
+                const result = event.target?.result;
+                if (!result) {
+                    setError("File is empty.");
+                    e.target.value = '';
+                    return;
+                }
+                const json = JSON.parse(result as string);
                 if (json.project_metadata) {
                     reset(json);
                     setError(null);
                     setStep(2); // Jump to end for review
+                    console.log("JSON file imported successfully");
                 } else {
-                    setError("Invalid JSON structure.");
+                    setError("Invalid JSON structure. Missing 'project_metadata' field.");
                 }
             } catch (err) {
-                setError("Failed to parse JSON file.");
+                console.error("JSON parse error:", err);
+                setError(`Failed to parse JSON file: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            } finally {
+                e.target.value = '';
             }
         };
         reader.readAsText(file);
-        e.target.value = '';
     };
 
     return (
