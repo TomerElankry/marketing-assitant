@@ -1,12 +1,12 @@
 import Fastify from 'fastify';
 import { MessageBus } from '@marketing-assistant/bus';
 import { TaskSchema } from '@marketing-assistant/schemas';
-import { DiscoveryService } from './services/discovery.js';
-import { initDB, getPool } from './db/index.js';
-import { JobRepository } from './repositories/job.js';
-import { TaskService } from './services/tasks.js';
-import { StorageService } from './services/storage.js';
-import { ArtifactRepository, Artifact } from './repositories/artifact.js';
+import { DiscoveryService } from './services/discovery';
+import { initDB, getPool } from './db/index';
+import { JobRepository } from './repositories/job';
+import { TaskService } from './services/tasks';
+import { StorageService } from './services/storage';
+import { ArtifactRepository, Artifact } from './repositories/artifact';
 
 const fastify = Fastify({ logger: true });
 const bus = new MessageBus();

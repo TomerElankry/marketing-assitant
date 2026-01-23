@@ -13,12 +13,11 @@ genai.configure(api_key=settings.GEMINI_API_KEY)
 
 class GeminiResearchService:
     def __init__(self):
-        # Using Gemini 2.0 Flash Exp which might support the tool or valid syntax
-        self.model_name = "gemini-2.0-flash-exp"
+        # Using gemini-pro which is generally more stable for free tier
+        self.model_name = "gemini-pro"
         
-        # Configure tools for Google Search grounding
-        # We use the string alias which SDK maps to the correct proto
-        self.tools = 'google_search_retrieval'
+        # Tools disabled for stability - relying on model knowledge
+        self.tools = None
         
     def _generate_creative_queries(self, data: QuestionnaireRequest) -> dict:
         """
