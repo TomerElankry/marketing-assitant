@@ -115,11 +115,16 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
     };
 
     return (
-        <div className="max-w-4xl mx-auto p-6 bg-slate-900 text-slate-100 rounded-xl shadow-2xl border border-slate-800">
+        <div className="max-w-4xl mx-auto p-8 glass-strong rounded-2xl shadow-2xl border border-slate-700/50 relative overflow-hidden scan-line">
+            <div className="absolute inset-0 holographic opacity-20 pointer-events-none"></div>
+            <div className="relative z-10">
             <div className="flex justify-between items-center mb-8">
-                <h2 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-emerald-400 bg-clip-text text-transparent">
-                    Start New Campaign
-                </h2>
+                <div>
+                    <h2 className="text-3xl font-bold text-gradient-animated mb-2">
+                        Start New Campaign
+                    </h2>
+                    <p className="text-sm text-slate-400">AI-powered strategy generation</p>
+                </div>
                 <div className="relative">
                     <input
                         type="file"
@@ -130,7 +135,7 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
                     />
                     <label
                         htmlFor="file-upload"
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg cursor-pointer transition-colors text-sm font-medium border border-slate-700"
+                        className="flex items-center gap-2 px-4 py-2 glass hover:glow-blue rounded-lg cursor-pointer transition-all text-sm font-medium border border-slate-600/50 hover:border-blue-500/50"
                     >
                         <Upload size={16} /> Import JSON
                     </label>
@@ -146,8 +151,11 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
             <form onSubmit={handleSubmit(onSubmit, (errors) => console.log("Validation Errors:", errors))} className="space-y-8">
 
                 {/* Section 1: Metadata */}
-                <section className="space-y-4">
-                    <h3 className="text-lg font-semibold text-slate-300 border-b border-slate-800 pb-2">1. Project Metadata</h3>
+                <section className="space-y-4 p-6 glass rounded-xl border border-slate-700/30 hover:border-blue-500/30 transition-all">
+                    <h3 className="text-lg font-semibold text-gradient-animated border-b border-slate-700/50 pb-2 flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center text-xs font-bold text-blue-400">1</span>
+                        Project Metadata
+                    </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Input label="Brand Name" registration={register("project_metadata.brand_name")} error={errors.project_metadata?.brand_name} />
                         <Input label="Website URL" registration={register("project_metadata.website_url")} error={errors.project_metadata?.website_url} />
@@ -157,16 +165,22 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
                 </section>
 
                 {/* Section 2: Product */}
-                <section className="space-y-4">
-                    <h3 className="text-lg font-semibold text-slate-300 border-b border-slate-800 pb-2">2. Product Definition</h3>
+                <section className="space-y-4 p-6 glass rounded-xl border border-slate-700/30 hover:border-purple-500/30 transition-all">
+                    <h3 className="text-lg font-semibold text-gradient-animated border-b border-slate-700/50 pb-2 flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-purple-500/20 flex items-center justify-center text-xs font-bold text-purple-400">2</span>
+                        Product Definition
+                    </h3>
                     <TextArea label="Product Description" registration={register("product_definition.product_description")} error={errors.product_definition?.product_description} />
                     <Input label="Core Problem Solved" registration={register("product_definition.core_problem_solved")} error={errors.product_definition?.core_problem_solved} />
                     <Input label="Unique Selling Proposition" registration={register("product_definition.unique_selling_proposition")} error={errors.product_definition?.unique_selling_proposition} />
                 </section>
 
                 {/* Section 3: Audience */}
-                <section className="space-y-4">
-                    <h3 className="text-lg font-semibold text-slate-300 border-b border-slate-800 pb-2">3. Target Audience</h3>
+                <section className="space-y-4 p-6 glass rounded-xl border border-slate-700/30 hover:border-cyan-500/30 transition-all">
+                    <h3 className="text-lg font-semibold text-gradient-animated border-b border-slate-700/50 pb-2 flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-cyan-500/20 flex items-center justify-center text-xs font-bold text-cyan-400">3</span>
+                        Target Audience
+                    </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Input label="Demographics" registration={register("target_audience.demographics")} error={errors.target_audience?.demographics} />
                         <Input label="Psychographics" registration={register("target_audience.psychographics")} error={errors.target_audience?.psychographics} />
@@ -175,8 +189,11 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
                 </section>
 
                 {/* Section 4: Market Context */}
-                <section className="space-y-4">
-                    <h3 className="text-lg font-semibold text-slate-300 border-b border-slate-800 pb-2">4. Market Context</h3>
+                <section className="space-y-4 p-6 glass rounded-xl border border-slate-700/30 hover:border-blue-500/30 transition-all">
+                    <h3 className="text-lg font-semibold text-gradient-animated border-b border-slate-700/50 pb-2 flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-blue-500/20 flex items-center justify-center text-xs font-bold text-blue-400">4</span>
+                        Market Context
+                    </h3>
 
                     <div className="space-y-2">
                         <label className="block text-sm font-medium text-slate-400">Main Competitors</label>
@@ -184,7 +201,7 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
                             <div key={field.id} className="flex gap-2">
                                 <input
                                     {...register(`market_context.main_competitors.${index}` as const)}
-                                    className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/50 outline-none"
+                                    className="flex-1 glass border border-slate-600/50 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 outline-none transition-all placeholder-slate-500"
                                     placeholder="Competitor Name"
                                     defaultValue={(field as any).name /* Hack for flat array */}
                                 />
@@ -204,8 +221,11 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
                 </section>
 
                 {/* Section 5: Goals */}
-                <section className="space-y-4">
-                    <h3 className="text-lg font-semibold text-slate-300 border-b border-slate-800 pb-2">5. Creative Goal</h3>
+                <section className="space-y-4 p-6 glass rounded-xl border border-slate-700/30 hover:border-purple-500/30 transition-all">
+                    <h3 className="text-lg font-semibold text-gradient-animated border-b border-slate-700/50 pb-2 flex items-center gap-2">
+                        <span className="w-6 h-6 rounded-full bg-purple-500/20 flex items-center justify-center text-xs font-bold text-purple-400">5</span>
+                        Creative Goal
+                    </h3>
                     <Input label="Primary Objective" registration={register("the_creative_goal.primary_objective")} error={errors.the_creative_goal?.primary_objective} />
                     <Input label="Desired Tone" registration={register("the_creative_goal.desired_tone_of_voice")} error={errors.the_creative_goal?.desired_tone_of_voice} />
 
@@ -215,7 +235,7 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
                             <div key={field.id} className="flex gap-2">
                                 <input
                                     {...register(`the_creative_goal.specific_channels.${index}` as const)}
-                                    className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/50 outline-none"
+                                    className="flex-1 glass border border-slate-600/50 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 outline-none transition-all placeholder-slate-500"
                                     placeholder="e.g. TikTok"
                                     defaultValue={(field as any).name}
                                 />
@@ -251,38 +271,54 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
                 <button
                     type="submit"
                     disabled={loading}
-                    className="w-full flex justify-center items-center gap-2 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full flex justify-center items-center gap-3 py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 hover:from-blue-500 hover:via-purple-500 hover:to-cyan-500 text-white font-bold rounded-xl transition-all shadow-lg glow-blue hover:glow-purple disabled:opacity-50 disabled:cursor-not-allowed relative overflow-hidden group"
                 >
-                    {loading ? <Loader2 className="animate-spin" /> : <Send size={18} />}
-                    {loading ? "Analyzing..." : "Launch Campaign Analysis"}
+                    <span className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-400 opacity-0 group-hover:opacity-20 transition-opacity"></span>
+                    {loading ? (
+                        <>
+                            <Loader2 className="animate-spin relative z-10" size={20} />
+                            <span className="relative z-10">AI Agents Processing...</span>
+                        </>
+                    ) : (
+                        <>
+                            <Send size={20} className="relative z-10 group-hover:translate-x-1 transition-transform" />
+                            <span className="relative z-10">Launch Campaign Analysis</span>
+                            <ArrowRight size={20} className="relative z-10 opacity-0 group-hover:opacity-100 -translate-x-2 group-hover:translate-x-0 transition-all" />
+                        </>
+                    )}
                 </button>
 
             </form>
+            </div>
         </div>
     );
 };
 
 // UI Helper Components
 const Input = ({ label, registration, error }: any) => (
-    <div className="space-y-1">
-        <label className="block text-sm font-medium text-slate-400">{label}</label>
+    <div className="space-y-2">
+        <label className="block text-sm font-medium text-slate-300">{label}</label>
         <input
             {...registration}
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/50 outline-none transition-all placeholder-slate-700"
+            className="w-full glass border border-slate-600/50 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 outline-none transition-all placeholder-slate-500 hover:border-slate-500/50"
         />
-        {error && <p className="text-xs text-red-400">{error.message}</p>}
+        {error && <p className="text-xs text-red-400 flex items-center gap-1">
+            <AlertCircle size={12} /> {error.message}
+        </p>}
     </div>
 );
 
 const TextArea = ({ label, registration, error }: any) => (
-    <div className="space-y-1">
-        <label className="block text-sm font-medium text-slate-400">{label}</label>
+    <div className="space-y-2">
+        <label className="block text-sm font-medium text-slate-300">{label}</label>
         <textarea
             {...registration}
             rows={3}
-            className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/50 outline-none transition-all placeholder-slate-700 resize-none"
+            className="w-full glass border border-slate-600/50 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 outline-none transition-all placeholder-slate-500 resize-none hover:border-slate-500/50"
         />
-        {error && <p className="text-xs text-red-400">{error.message}</p>}
+        {error && <p className="text-xs text-red-400 flex items-center gap-1">
+            <AlertCircle size={12} /> {error.message}
+        </p>}
     </div>
 );
 

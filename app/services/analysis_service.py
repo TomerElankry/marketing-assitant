@@ -32,7 +32,7 @@ class AnalysisService:
         Audience: {audience}
         Goals: {goals}
 
-        # Market Research Data
+        # Market Research Data (Dual-Source: Perplexity + Gemini)
         {json.dumps(research, indent=2)}
 
         # Task

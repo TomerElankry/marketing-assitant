@@ -1,23 +1,46 @@
-# Marketing Strategy AI Agent (MVP) 🚀
+# Marketing Strategy AI Agent 🚀
 
-A powerful, agentic AI system that autonomously conducts deep market research, generates strategic marketing angles, and produces ready-to-use PowerPoint presentations.
+A powerful, agentic AI system that autonomously conducts deep market research, generates strategic marketing angles, and produces ready-to-use PowerPoint presentations using **triple AI model consensus**.
 
 ## 🎯 What It Does
 1.  **Ingests Brand Info**: Takes a detailed questionnaire about a brand or product.
 2.  **Validates Input (Gemini)**: Ensures the input is sufficient and meaningful using `google-generativeai`.
-3.  **Deep Research (Perplexity)**: Conducts live web research on competitors, social sentiment, and market trends.
-4.  **Strategic Analysis (GPT-4o)**: Synthesizes research into unique "Hooks", "Angles", and a "Creative Pivot".
+3.  **Dual-Source Research**: 
+    - **Perplexity**: Live web research on competitors, social sentiment, and market trends
+    - **Gemini**: Creative research on visual trends, cultural insights, and campaign examples
+4.  **Triple Analysis & Consensus**: 
+    - **GPT-4o, Gemini, and Perplexity** analyze research in parallel
+    - **Consensus Engine** synthesizes three proposals into a final strategy
+    - Identifies agreements and disagreements between models
 5.  **Generates Presentation**: Structures a 7-slide deck and builds a `.pptx` file using `python-pptx`.
-6.  **Interactive UI**: Provides a modern React interface to submit jobs, track real-time progress, and download results.
+6.  **AI-Themed UI**: Modern, futuristic React interface with glassmorphism, neural network animations, and holographic effects.
 
 ## 🏗 Architecture
 *   **Backend**: FastAPI (Python), SQLAlchemy (Postgres)
-*   **Frontend**: React, Vite, Tailwind CSS, TypeScript
+*   **Frontend**: React, Vite, Tailwind CSS v4, TypeScript
 *   **Storage**: MinIO (S3-compatible) for JSON artifacts and PPTX files
 *   **AI Models**:
-    *   **Gemini 1.5 Flash**: Validation Agent
-    *   **Perplexity (Sonar)**: Research Agent
-    *   **GPT-4o**: Analysis & Presentation Agent
+    *   **Gemini 2.0 Flash**: Validation Agent + Creative Research + Analysis
+    *   **Perplexity (Sonar)**: Market Research Agent + Analysis
+    *   **GPT-4o**: Strategic Analysis + Consensus Generation + Presentation
+
+## ✨ Key Features
+
+### Enhanced Research Pipeline
+- **Dual-Source Research**: Perplexity (data-focused) + Gemini (creative-focused) run in parallel
+- **Research Consolidation**: Merges both sources into unified research document
+
+### Triple Analysis & Consensus
+- **Parallel Analysis**: GPT-4o, Gemini, and Perplexity analyze research simultaneously
+- **Consensus Engine**: Synthesizes three independent proposals into final strategy
+- **Transparency**: Shows where models agreed vs. disagreed in consensus notes
+
+### Modern AI-Themed UI
+- **Glassmorphism**: Frosted glass effects throughout
+- **Neural Network Animations**: Animated grid patterns
+- **Holographic Effects**: Gradient shifts and particle animations
+- **Glow Effects**: Blue, purple, and cyan glow animations
+- **Real-time Status**: Enhanced progress tracking with AI agent indicators
 
 ## ⚡ Quick Start
 
