@@ -113,9 +113,10 @@ def get_job_status(job_id: str, db: Session = Depends(get_db)):
         "job_id": job.id,
         "status": job.status,
         "created_at": job.created_at,
-        "created_at": job.created_at,
         "updated_at": job.updated_at,
-        "brand_name": job.project_metadata.get("brand_name")
+        "brand_name": job.project_metadata.get("brand_name"),
+        "failed_step": job.failed_step,
+        "error_message": job.error_message
     }
 
 @router.get("/jobs/{job_id}/analysis", summary="Get Analysis Results")

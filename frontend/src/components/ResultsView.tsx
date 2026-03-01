@@ -13,14 +13,14 @@ const ResultsView: React.FC<ResultsViewProps> = ({ jobId }) => {
     const { data: analysis, isLoading } = useQuery({
         queryKey: ['jobAnalysis', jobId],
         queryFn: async () => {
-            const res = await axios.get(`/api/jobs/${jobId}/analysis`);
+            const res = await axios.get(`/api/v1/jobs/${jobId}/analysis`);
             return res.data;
         }
     });
 
     const handleDownload = () => {
         // Direct navigation to download endpoint to trigger browser download
-        window.location.href = `/api/jobs/${jobId}/download`;
+        window.location.href = `/api/v1/jobs/${jobId}/download`;
     };
 
     if (isLoading) {

@@ -1,8 +1,12 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { Loader2, CheckCircle2, FileText, Download, AlertCircle } from 'lucide-react';
 import type { JobResponse } from '../types';
+
+// Exponential backoff: 2s → 4s → 8s → … capped at 30s
+const POLL_MIN_MS = 2_000;
+const POLL_MAX_MS = 30_000;
 
 interface StatusDashboardProps {
     jobId: string;
@@ -30,19 +34,23 @@ const steps = [
 ];
 
 const StatusDashboard: React.FC<StatusDashboardProps> = ({ jobId, onComplete }) => {
+    const pollIntervalRef = useRef(POLL_MIN_MS);
 
     const { data, error, isError } = useQuery({
         queryKey: ['jobStatus', jobId],
         queryFn: async () => {
-            const res = await axios.get(`/api/jobs/${jobId}`);
-            return res.data; // This matches the specific endpoint return structure
+            const res = await axios.get(`/api/v1/jobs/${jobId}`);
+            return res.data;
         },
         refetchInterval: (query) => {
             const status = query.state.data?.status;
             if (status === 'completed' || status === 'failed') {
                 return false; // Stop polling
             }
-            return 2000; // Poll every 2s
+            // Double the interval on each successful poll, capped at POLL_MAX_MS
+            const current = pollIntervalRef.current;
+            pollIntervalRef.current = Math.min(current * 2, POLL_MAX_MS);
+            return current;
         },
     });
 
@@ -146,7 +154,15 @@ const StatusDashboard: React.FC<StatusDashboardProps> = ({ jobId, onComplete }) 
                 <div className="mt-8 p-6 glass border border-red-500/50 rounded-xl text-center">
                     <AlertCircle className="mx-auto mb-3 text-red-400" size={32} />
                     <h3 className="text-lg font-bold text-red-400 mb-1">Process Failed</h3>
-                    <p className="text-sm text-red-300/80">Please check backend logs for details.</p>
+                    {data?.failed_step && (
+                        <p className="text-xs font-mono text-red-400/70 mb-1">Step: {data.failed_step}</p>
+                    )}
+                    {data?.error_message && (
+                        <p className="text-sm text-red-300/80">{data.error_message}</p>
+                    )}
+                    {!data?.error_message && (
+                        <p className="text-sm text-red-300/80">Please check backend logs for details.</p>
+                    )}
                 </div>
             )}
             </div>

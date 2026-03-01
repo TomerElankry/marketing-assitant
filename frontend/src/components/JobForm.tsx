@@ -65,7 +65,7 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
         setLoading(true);
         setError(null);
         try {
-            const response = await axios.post('/api/jobs', data);
+            const response = await axios.post('/api/v1/jobs', data);
             if (response.status === 201) {
                 onJobCreated(response.data.job_id);
             }
