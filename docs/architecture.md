@@ -1,53 +1,99 @@
 # System Architecture: Creative Marketing Strategy Engine
 
-**Version:** 1.0  
-**Date:** December 21, 2025  
-**Status:** Finalized for Implementation  
+**Version:** 2.0
+**Date:** March 2026
+**Status:** Implemented
 
 ---
 
 ## 1. High-Level Overview
-The system is built as an **Event-Driven Orchestration** platform using the **Model Context Protocol (MCP)**. It separates the management of task lifecycles from the execution of specialized AI agents to ensure scalability and reliability.
+The system is a **FastAPI-based async pipeline** that orchestrates multiple AI providers to transform a marketing questionnaire into a downloadable strategy presentation. A React SPA serves as the frontend, a PostgreSQL database tracks job state, and MinIO stores intermediate and final artifacts.
+
+---
 
 ## 2. Architectural Layers
 
-### 2.1 Orchestration Layer (The Host)
-* **Orchestrator Service:** Acts as the central brain managing the job state machine, from initial intake to final file generation.
-* **Task Lifecycle Management:** Handles state transitions (e.g., `Pending` -> `Validating` -> `Researching` -> `Analyzing` -> `Generating`).
-* **MCP Host:** Discovers and invokes tools from specialized agent servers via a standardized protocol.
+### 2.1 API Layer (FastAPI)
+* **REST API:** Exposes endpoints for job submission, status polling, result retrieval, and file download.
+* **Auth Endpoints:** JWT-based registration, login, and token refresh.
+* **Admin Endpoints:** Cross-user job management for admins.
+* **Background Tasks:** Pipeline execution is handed off to `asyncio` background tasks so the HTTP response returns immediately with a job ID.
 
-### 2.2 Messaging & Communication
-* **Event Bus:** Utilizes **NATS** or **Kafka** to distribute tasks asynchronously across the system.
-* **Progress Streaming:** Emits real-time status updates to the UI so users can track the "Discovery Phase" and "Analysis Phase".
+### 2.2 Pipeline Orchestration (`workflow.py`)
+The orchestrator runs as an async background task and manages the full job lifecycle. It owns all state transitions and error handling.
 
-### 2.3 Agent Execution Fleet (The Workers)
-* **Validation Agent (Gemini API):** Performs a logic-based quality gate on the incoming questionnaire to ensure data integrity.
-* **Research Fleet (Dual-Source):**
-    * **Perplexity Agent:** Performs deep web scans for competitor hooks and social media sentiment analysis.
-    * **Gemini Agent:** Utilizes Google Search grounding for real-time market trend identification.
-* **Analysis Workers (Triple-Analysis):** Parallel execution of **GPT-4o**, **Gemini 1.5 Pro**, and **Perplexity** to process research data and propose creative pivots.
-* **Presentation Agent (Gemini API):** Transforms synthesized findings into a structured JSON slide-deck representation.
+**State Machine:**
+```
+PENDING → RESEARCHING → ANALYZING → COMPLETED
+                                  ↘ FAILED (+ failed_step + error_message)
+```
 
-### 2.4 Data & Infrastructure Layer
-* **Relational Database (Postgres):** Stores user profiles, project metadata, and job history logs.
-* **Object Storage (MinIO/S3):** Caches intermediate JSON research blobs (Artifacts) and hosts the final `.pptx` deliverables.
-* **Observability Platform:** Uses **OpenTelemetry** and **Jaeger** to track jobs via a unique `trace_id` across all API boundaries.
+**Pipeline Steps (in order):**
+1. `triple_research` — Parallel execution of Perplexity, Gemini, and Brand Audit
+2. `consolidation` — Merge research outputs into a single resource
+3. `persist_research` — Upload individual and consolidated JSON blobs to MinIO
+4. `triple_analysis` — Parallel execution of GPT-4o, Gemini, and Perplexity analysis
+5. `consensus` — Generate consensus report with confidence score
+6. `slide_structure` — Structure slide content from consensus data
+7. `pptx_generation` — Render slides to `.pptx` and upload to MinIO
+
+### 2.3 Service Layer
+Each service is a stateless module called directly by the orchestrator:
+
+| Service | Responsibility | Provider |
+|---|---|---|
+| `research_service` | Competitor data, social sentiment, USP validation | Perplexity (Sonar) |
+| `gemini_research_service` | Visual trends, cultural context, campaign examples | Gemini 2.0 Flash |
+| `brand_audit_service` | Live website scrape for brand positioning & tone | HTTP scrape |
+| `research_consolidator` | Merges triple research into unified resource | In-process |
+| `multi_analysis_service` | Parallel creative strategy analysis | GPT-4o, Gemini, Perplexity |
+| `consensus_service` | Maps agreement/disagreement, generates confidence score | In-process |
+| `presentation_service` | Structures slides + renders `.pptx` with dynamic theming | Gemini 2.0 Flash + python-pptx |
+| `storage_service` | Upload/download JSON blobs and binary files | MinIO (S3) |
+| `auth_service` | JWT creation, password hashing, user lookup | In-process |
+
+### 2.4 Data & Storage Layer
+* **PostgreSQL:** Stores `User` and `Job` records. Jobs carry status, timestamps, project metadata (questionnaire JSON), and diagnostic fields (`failed_step`, `error_message`).
+* **MinIO (S3-compatible):** Stores all pipeline artifacts under `jobs/{job_id}/`:
+    * `research_perplexity.json`
+    * `research_gemini.json`
+    * `research_brand_audit.json`
+    * `research_consolidated.json`
+    * `analysis_raw_triple.json`
+    * `analysis.json` (consensus)
+    * `slides.json`
+    * `presentation.pptx`
+
+### 2.5 Frontend (React + TypeScript)
+* Single-page application communicating with the FastAPI backend via REST.
+* Auth context with JWT token management.
+* Job submission form, real-time status polling, and results/download view.
 
 ---
 
 ## 3. Detailed Data Flow
 
-1.  **Intake:** The system receives the questionnaire and saves the initial state in **Postgres**.
-2.  **Validation:** The Orchestrator triggers the **Gemini Validation Agent**. If successful, it proceeds; otherwise, it returns feedback to the user.
-3.  **Dual-Research:** Parallel tasks are sent to **Perplexity** and **Gemini**. Both agents perform live web searches to map "The Talk" and market gaps.
-4.  **Consolidation:** The Orchestrator merges research data into a "Full Research Resource" and saves it to **MinIO**.
-5.  **Triple-Analysis:** The combined resource is analyzed by **GPT-4o**, **Gemini**, and **Perplexity** simultaneously to find consensus and creative disagreements.
-6.  **Presentation Generation:** The **Presentation Agent** processes the merged analysis into slide content.
-7.  **Final Export:** A background worker converts the JSON slide structure into a downloadable **.pptx** file.
+1. **Auth:** User logs in, receives JWT access token.
+2. **Intake:** User submits questionnaire. API creates a `Job` record (status: `PENDING`) and fires off the background pipeline task, returning the `job_id` immediately.
+3. **Triple Research (`RESEARCHING`):** Perplexity, Gemini, and Brand Audit run in parallel via `asyncio.gather`. Perplexity and Brand Audit failures are caught and logged — the pipeline degrades gracefully to Gemini-only if needed. A 120s timeout applies to the whole gather.
+4. **Consolidation:** `research_consolidator` merges all available research into one unified document. All individual and consolidated artifacts are uploaded to MinIO.
+5. **Triple Analysis (`ANALYZING`):** GPT-4o, Gemini, and Perplexity analyze the consolidated research in parallel. A 90s timeout applies.
+6. **Consensus:** `consensus_service` identifies agreement/disagreement points and calculates a confidence score. Raw and consensus analysis artifacts saved to MinIO.
+7. **Slide Structure:** `presentation_service.structure_content` converts the consensus into a slide-by-slide JSON structure.
+8. **PPTX Generation:** `presentation_service.generate_pptx` renders the slide JSON to a `.pptx` file with dynamic industry-based theming, uploaded to MinIO.
+9. **Completion:** Job status set to `COMPLETED`. Frontend polling detects this and presents the download link.
 
 ---
 
-## 4. Security & Resilience
-* **PII Masking:** Personally Identifiable Information is redacted from the questionnaire before being transmitted to external vendor APIs.
-* **Degraded Mode:** If one of the three Analysis Workers fails, the job continues with the remaining two, surfacing a modified confidence score.
-* **Retry Policy:** Exponential backoff and circuit breakers are applied to all external API calls to manage rate limits and transient outages.
+## 4. Resilience & Error Handling
+* **Graceful Degradation:** Perplexity and Brand Audit services are wrapped in `try/except` — failures produce empty dicts and log warnings rather than aborting the job.
+* **Timeout Management:** `asyncio.wait_for` enforces 120s on research and 90s on analysis. Timeouts fail the job with a clear `failed_step`.
+* **Diagnostic Fields:** Every failed job records `failed_step` (which pipeline stage failed) and `error_message` (truncated to 1000 chars) in the database.
+* **DB Session Safety:** Each background task creates its own `SessionLocal` session, independent of the HTTP request lifecycle.
+
+---
+
+## 5. Security
+* **Auth:** Passwords hashed with bcrypt. JWT tokens expire after 8 hours.
+* **Admin vs User:** `is_admin` flag on `User` model gates admin-only endpoints.
+* **Config via Env:** All secrets (API keys, DB URL, MinIO credentials, JWT secret) are loaded from environment variables — no secrets in source code.

@@ -1,5 +1,6 @@
-from sqlalchemy import Column, String, DateTime, Enum, JSON, Index
+from sqlalchemy import Column, String, DateTime, Boolean, ForeignKey, Enum, JSON, Index
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.orm import relationship
 import uuid
 from datetime import datetime
 import enum
@@ -15,6 +16,20 @@ class JobStatus(str, enum.Enum):
     FAILED = "failed"
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False)
+    full_name = Column(String, nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    is_admin = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    jobs = relationship("Job", back_populates="owner")
+
+
 class Job(Base):
     __tablename__ = "jobs"
 
@@ -28,7 +43,12 @@ class Job(Base):
     failed_step = Column(String, nullable=True)
     error_message = Column(String, nullable=True)
 
+    # Owner — nullable so existing jobs without a user still work
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True, index=True)
+    owner = relationship("User", back_populates="jobs")
+
     __table_args__ = (
         Index("ix_jobs_status", "status"),
         Index("ix_jobs_created_at", "created_at"),
+        Index("ix_jobs_user_id", "user_id"),
     )

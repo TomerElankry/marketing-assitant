@@ -6,6 +6,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from app.core.config import settings
 from app.api import endpoints
+from app.api.auth_endpoints import router as auth_router
+from app.api.admin_endpoints import router as admin_router
 from app.db.base import Base
 from app.db.session import engine
 from app.db import models  # Import models to register them
@@ -39,6 +41,8 @@ async def validation_exception_handler(request, exc):
     return JSONResponse(status_code=422, content={"detail": exc.errors()})
 
 
+app.include_router(auth_router, prefix=settings.API_V1_STR)
+app.include_router(admin_router, prefix=settings.API_V1_STR)
 app.include_router(endpoints.router, prefix=settings.API_V1_STR)
 
 

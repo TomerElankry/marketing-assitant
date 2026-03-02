@@ -1,85 +1,102 @@
+**Project:** AI-Driven Creative Marketing Strategy Engine
+**Version:** 2.0
+**Date:** March 2026
+**Status:** Implemented
 
-**Project:** AI-Driven Creative Marketing Strategy Engine  \
-**Version:** 2.5 (Dual-Research & Presentation-First)  \
-**Date:** December 21, 2025  \
-**Status:** Finalized for Implementation  \
-\
----\
-\
-## 1. Purpose & Scope\
-The system is designed to transform a structured client questionnaire into a professional, data-backed creative marketing strategy presentation. It utilizes an orchestration layer to perform deep research across multiple sources, triangulate insights using three distinct AI models, and automate the production of a strategic slide deck.\
-\
-**Core Objectives:**\
-* **Intelligent Validation:** Ensure all user inputs are high-quality, logical, and sufficient before processing.\
-* **Comprehensive Research:** Utilize dual-source data (Perplexity and Gemini) to map the market and social sentiment ("The Talk").\
-* **Strategic Triangulation:** Leverage GPT-4o, Gemini, and Perplexity in parallel to identify creative consensus and deviations.\
-* **Dynamic Presentation Output:** Deliver a professional, slide-based strategy ready for client use in .pptx format.\
-\
----\
-\
-## 2. System Architecture & Agents\
-The system follows the **Model Context Protocol (MCP)**, where a central Orchestrator acts as the Host managing specialized API-driven agents.\
-\
-### 2.1 Agent Roster\
-* **Orchestrator Service:** Controls the workflow, state transitions, and asynchronous task dispatching.\
-* **Validation Agent (Gemini API):** Acts as the gatekeeper to verify questionnaire logic, completeness, and context.\
-* **Research Fleet:**\
-    * **Agent A (Perplexity API):** Conducts deep web scans for competitor hooks and social media sentiment analysis.\
-    * **Agent B (Gemini API + Search):** Performs real-time market grounding and creative trend identification.\
-* **Analysis Workers (GPT-4o, Gemini 1.5 Pro, Perplexity API):** Three independent models that analyze consolidated research to propose creative strategies.\
-* **Validation & Merging Agent:** Synthesizes analysis outputs into a consensus-based report, highlighting disagreements and providing a confidence score.\
-* **Presentation Agent (Gemini API):** Transforms the final strategic findings into a structured, slide-by-slide presentation.\
-\
----\
-\
-## 3. Functional Requirements\
-\
-### 3.1 Questionnaire Intake & Validation (Gemini)\
-* **Input Handling:** The system accepts structured business and product data via an intake form.\
-* **AI Validation:** Gemini API evaluates the quality of inputs; if content is vague or insufficient, the system flags specific fields for user refinement.\
-* **Normalization:** Validated data is converted into a standard JSON schema optimized for the research agents.\
-\
-### 3.2 Dual-Source Research (Perplexity & Gemini)\
-* **Sentiment Analysis:** Research agents analyze social media and web data to define "What's the talk" about the brand.\
-* **Competitor Audit:** Identify existing competitor creative strategies and visual angles.\
-* **Cultural Context:** Research target country norms, tone, and sensitivities to inform localization.\
-* **Data Aggregation:** The Orchestrator merges research from both Perplexity and Gemini into a single high-fidelity research resource.\
-\
-### 3.3 Triple-Analysis Engine (Consensus Model)\
-* **Parallel Analysis:** GPT-4o, Gemini Pro, and Perplexity simultaneously evaluate research data to propose creative pivots.\
-* **Consensus Detection:** The system automatically maps points of agreement across at least two models.\
-* **Conflict Visualization:** Areas of disagreement (divergent creative directions) are highlighted to provide multiple strategic perspectives.\
-* **Confidence Calculation:** A confidence score is generated based on the level of alignment among the three models.\
-\
-### 3.4 Presentation Generation (Gemini)\
-* **Structured Output:** The Presentation Agent generates a structured JSON representation of a slide deck.\
-* **Core Slide Modules:**\
-    * **Creative Audit:** Analysis of current marketing efforts.\
-    * **Brand Sentiment:** Summary of "The Talk" and public perception.\
-    * **Competitive Landscape:** Mapping hooks, angles, and market gaps.\
-    * **Creative Improvements:** New proposed messaging, hooks, and campaign concepts.\
-* **Format Conversion:** The system renders the JSON structure into a downloadable **.pptx** (PowerPoint) file.\
-\
----\
-\
-## 4. Technical Infrastructure\
-\
-### 4.1 Messaging & Communication\
-* **Event Bus:** Use NATS or Kafka for asynchronous task distribution and status streaming.\
-* **Protocols:** Use MCP for tool discovery and resource sharing between agents.\
-\
-### 4.2 Storage & Data Persistence\
-* **Relational DB:** Postgres for project metadata, user profiles, and job history.\
-* **Resource Store:** MinIO (S3-compatible) for caching intermediate JSON blobs and finalized presentation artifacts.\
-\
-### 4.3 Observability & Security\
-* **Tracing:** Implement OpenTelemetry to track every run with a unique `trace_id`.\
-* **Privacy:** Mask PII in questionnaire fields before data is transmitted to external vendor APIs.\
-\
----\
-\
-## 5. Acceptance Criteria\
-* **Validation Success:** Gemini accurately flags incomplete or illogical questionnaires.\
-* **Research Depth:** Perplexity and Gemini return verified competitor strategies and social sentiment data.\
-* **Consensus Accuracy:** The final report clearly distinguishes between multi-model agreements and disagreements.\
-* **Deliverable Quality:** The system generates a valid, downloadable **.pptx** file containing all specified strategy modules.}
+---
+
+## 1. Purpose & Scope
+The system transforms a structured client questionnaire into a professional, data-backed creative marketing strategy presentation. A FastAPI backend orchestrates triple-source research, triple-model analysis, consensus scoring, and PPTX generation as an async background pipeline. A React frontend provides job submission, status tracking, and file download.
+
+**Core Objectives:**
+* **Triple-Source Research:** Gather real-time data from Perplexity (social/competitor), Gemini (trends/cultural), and a live brand audit (homepage scrape).
+* **Strategic Triangulation:** Leverage GPT-4o, Gemini, and Perplexity in parallel to identify creative consensus and deviations.
+* **Dynamic Presentation Output:** Deliver a professionally themed, slide-based strategy in `.pptx` format.
+* **Reliability:** Graceful degradation when optional data sources fail; diagnostic fields for every failed job.
+
+---
+
+## 2. System Architecture & Services
+The system is a **direct-orchestration pipeline** where a central `workflow.py` background task calls specialized services in a defined sequence. There is no message broker or external orchestration layer.
+
+### 2.1 Service Roster
+
+* **`workflow.py` (Orchestrator):** Controls the entire pipeline, manages job state transitions in PostgreSQL, and handles timeouts and failures.
+* **`research_service` (Perplexity):** Conducts deep web and social media scans for competitor hooks, USP validation, brand awareness, and share of voice using the Sonar model. Optional — pipeline continues if it fails.
+* **`gemini_research_service` (Gemini 2.0 Flash):** Performs real-time research on visual trends, cultural norms, campaign examples, and content format insights using Google Search grounding.
+* **`brand_audit_service` (HTTP Scrape):** Scrapes the client's live website to extract current brand positioning, messaging tone, and content gaps. Optional — pipeline continues if the URL is unreachable.
+* **`research_consolidator`:** Merges outputs from all three research sources into a single unified research document passed to analysis.
+* **`multi_analysis_service` (GPT-4o + Gemini + Perplexity):** Runs three independent strategic analyses in parallel against the consolidated research.
+* **`consensus_service`:** Maps agreement and disagreement points across the three analysis outputs and generates a confidence score.
+* **`presentation_service` (Gemini 2.0 Flash + python-pptx):** Structures the consensus into a slide-by-slide JSON layout, then renders it as a dynamically themed `.pptx` file.
+* **`storage_service` (MinIO):** Handles all artifact uploads and downloads against an S3-compatible object store.
+* **`auth_service`:** JWT creation/validation and bcrypt password management.
+
+---
+
+## 3. Functional Requirements
+
+### 3.1 Authentication
+* **Registration:** Users create an account with email and password.
+* **Login:** Returns a JWT access token valid for 8 hours.
+* **Protected Routes:** All job and result endpoints require a valid Bearer token.
+* **Admin Access:** Users with `is_admin=True` can access cross-user job management endpoints.
+
+### 3.2 Questionnaire Intake
+* **Input Handling:** The system accepts structured business and product data via a frontend form.
+* **Job Creation:** A `Job` record is immediately created in PostgreSQL with status `PENDING` and the full questionnaire stored as `project_metadata` (JSON).
+* **Async Dispatch:** The pipeline is handed off to a background async task; the API returns `job_id` immediately.
+
+### 3.3 Triple-Source Research
+* **Perplexity (Sonar):** Analyzes web and social media to define "What's the talk," competitor creative strategies, USP clarity, and share of voice.
+* **Gemini (gemini-2.0-flash):** Uses Google Search grounding to identify visual trends, cultural sensitivities, campaign examples, and optimal content formats for the target market.
+* **Brand Audit:** Scrapes the client's homepage URL to extract current positioning, tone of voice, and messaging gaps.
+* **Parallel Execution:** All three sources run concurrently via `asyncio.gather` with a 120s combined timeout.
+* **Graceful Degradation:** Perplexity and Brand Audit failures are caught silently; the pipeline warns and continues on available data. Gemini research is required.
+* **Consolidation:** `research_consolidator` merges all available results into a single document. All individual and consolidated blobs are saved to MinIO.
+
+### 3.4 Triple-Analysis Engine
+* **Parallel Analysis:** GPT-4o, Gemini, and Perplexity simultaneously analyze the consolidated research to propose creative pivots, messaging angles, and campaign hooks. Runs with a 90s timeout.
+* **Raw Artifact:** The three raw analysis outputs are saved to MinIO as `analysis_raw_triple.json`.
+
+### 3.5 Consensus Engine
+* **Agreement Mapping:** Identifies strategic points agreed upon by at least two of the three models.
+* **Conflict Surface:** Highlights divergent creative directions where models disagree.
+* **Confidence Score:** Calculates a reliability metric based on the degree of model alignment.
+* **Artifact:** Consensus report saved to MinIO as `analysis.json`.
+
+### 3.6 Presentation Generation
+* **Slide Structuring:** `presentation_service.structure_content` converts the consensus into a slide-by-slide JSON layout covering:
+    * Creative Audit (current marketing efforts)
+    * Brand Sentiment ("The Talk" and public perception)
+    * Competitive Landscape (competitor hooks and market gaps)
+    * Creative Pivot (proposed messaging, hooks, campaign concepts)
+* **Dynamic Theming:** PPTX visual design adapts based on industry/brand context.
+* **PPTX Rendering:** `python-pptx` renders the JSON structure into a `.pptx` file via a safe temp file, which is then uploaded to MinIO.
+* **Download:** A signed or direct download endpoint serves the final `.pptx` to the authenticated user.
+
+---
+
+## 4. Technical Infrastructure
+
+### 4.1 API & Async Execution
+* **Framework:** FastAPI with `asyncio` background tasks for non-blocking pipeline execution.
+* **No Message Broker:** Task dispatch is in-process; there is no NATS, Kafka, or Celery dependency.
+
+### 4.2 Storage & Data Persistence
+* **PostgreSQL:** Stores `User` and `Job` records. Key job fields: `status`, `project_metadata` (JSON), `failed_step`, `error_message`, `user_id`.
+* **MinIO (S3-compatible):** Stores all pipeline artifacts under `jobs/{job_id}/`. Bucket: `marketing-artifacts`.
+
+### 4.3 Configuration
+* All secrets and tunables are loaded from environment variables (`.env` file in development).
+* Key settings: `GEMINI_API_KEY`, `PERPLEXITY_API_KEY`, `OPENAI_API_KEY`, `DATABASE_URL`, `MINIO_*`, `SECRET_KEY`, `RESEARCH_TIMEOUT` (120s), `ANALYSIS_TIMEOUT` (90s).
+* Model versions are configurable via env: `GPT_MODEL`, `GEMINI_MODEL`, `PERPLEXITY_MODEL`.
+
+---
+
+## 5. Acceptance Criteria
+* **Research Integrity:** Gemini research completes successfully on every job. Perplexity and Brand Audit degrade gracefully with logged warnings.
+* **Analysis Coverage:** All three analysis models run and produce outputs. Consensus correctly surfaces agreement/disagreement points.
+* **Deliverable Quality:** The system generates a valid, openable `.pptx` file containing all four specified strategy modules with dynamic theming applied.
+* **Job Auditability:** Every failed job records `failed_step` and `error_message` in the database. Completed jobs have all artifacts accessible in MinIO.
+* **Auth Security:** Unauthenticated requests to protected endpoints return 401. Admin endpoints reject non-admin users with 403.

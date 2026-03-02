@@ -30,6 +30,10 @@ class Settings(BaseSettings):
     MINIO_SECRET_KEY: str = ""
     MINIO_BUCKET: str = "marketing-artifacts"
 
+    # Auth / JWT
+    SECRET_KEY: str = "changeme-generate-a-strong-secret-in-production"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8  # 8 hours
+
     # Timeouts (seconds)
     RESEARCH_TIMEOUT: int = 120
     ANALYSIS_TIMEOUT: int = 90

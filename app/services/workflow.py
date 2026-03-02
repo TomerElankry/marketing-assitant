@@ -10,6 +10,7 @@ from app.core.config import settings
 from app.db.models import Job, JobStatus
 from app.db.session import SessionLocal
 from app.schemas.questionnaire import QuestionnaireRequest
+from app.services.brand_audit_service import brand_audit_service
 from app.services.consensus_service import consensus_service
 from app.services.gemini_research_service import gemini_research_service
 from app.services.multi_analysis_service import multi_analysis_service
@@ -54,12 +55,14 @@ async def perform_research_workflow(job_id: str, request_data: dict):
         job.status = JobStatus.RESEARCHING
         db.commit()
 
-        # 2. Run Dual Research in parallel with timeout
-        # Perplexity is optional — if its key is expired or it's unreachable,
-        # the job continues in degraded mode using Gemini research only.
-        step = "dual_research"
+        # 2. Run Triple Research in parallel with timeout:
+        #    - Perplexity: competitor data, USP validation, brand awareness, share of voice
+        #    - Gemini: visual trends, cultural insights, campaign examples, content formats
+        #    - Brand Audit: homepage scrape → current positioning, tone, gaps
+        #    Perplexity and Brand Audit are optional — failures degrade gracefully.
+        step = "triple_research"
         questionnaire = QuestionnaireRequest(**request_data)
-        logger.info(f"[Job {job_id}] Starting Dual Research (Perplexity + Gemini)")
+        logger.info(f"[Job {job_id}] Starting Triple Research (Perplexity + Gemini + Brand Audit)")
 
         async def safe_perplexity():
             try:
@@ -68,26 +71,42 @@ async def perform_research_workflow(job_id: str, request_data: dict):
                 logger.warning(f"[Job {job_id}] Perplexity research failed, continuing without it: {e}")
                 return {}
 
-        perplexity_results, gemini_results = await asyncio.wait_for(
+        async def safe_brand_audit():
+            try:
+                return await brand_audit_service.audit_brand_website(
+                    str(questionnaire.project_metadata.website_url),
+                    questionnaire.project_metadata.brand_name,
+                )
+            except Exception as e:
+                logger.warning(f"[Job {job_id}] Brand audit failed, continuing without it: {e}")
+                return {}
+
+        perplexity_results, gemini_results, brand_audit = await asyncio.wait_for(
             asyncio.gather(
                 safe_perplexity(),
                 gemini_research_service.conduct_creative_research(questionnaire),
+                safe_brand_audit(),
             ),
             timeout=settings.RESEARCH_TIMEOUT,
         )
 
         if not perplexity_results:
             logger.warning(f"[Job {job_id}] Running in Gemini-only research mode")
+        if not brand_audit:
+            logger.warning(f"[Job {job_id}] Brand audit unavailable — proceeding without homepage data")
 
         # 3. Consolidate Research
         step = "consolidation"
         logger.info(f"[Job {job_id}] Consolidating Research")
-        consolidated_research = research_consolidator.consolidate_research(perplexity_results, gemini_results)
+        consolidated_research = research_consolidator.consolidate_research(
+            perplexity_results, gemini_results, brand_audit
+        )
 
         # 4. Persist Research artifacts
         step = "persist_research"
         storage_service.upload_json(f"jobs/{job_id}/research_perplexity.json", perplexity_results)
         storage_service.upload_json(f"jobs/{job_id}/research_gemini.json", gemini_results)
+        storage_service.upload_json(f"jobs/{job_id}/research_brand_audit.json", brand_audit)
         storage_service.upload_json(f"jobs/{job_id}/research_consolidated.json", consolidated_research)
         logger.info(f"[Job {job_id}] Research artifacts saved")
 

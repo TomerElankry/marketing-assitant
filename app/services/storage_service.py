@@ -1,5 +1,6 @@
 import json
 import logging
+from typing import Optional
 
 import boto3
 from botocore.exceptions import ClientError
@@ -60,7 +61,7 @@ class StorageService:
             logger.error(f"File upload failed for key '{key}': {e}")
             return False
 
-    def get_json(self, key: str) -> dict | None:
+    def get_json(self, key: str) -> Optional[dict]:
         try:
             response = self.s3_client.get_object(Bucket=self.bucket_name, Key=key)
             return json.loads(response["Body"].read().decode("utf-8"))

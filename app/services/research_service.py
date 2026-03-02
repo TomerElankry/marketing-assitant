@@ -52,21 +52,33 @@ class ResearchService:
     def _generate_queries(self, data: QuestionnaireRequest) -> dict:
         brand = data.project_metadata.brand_name
         industry = data.project_metadata.industry
+        country = data.project_metadata.target_country
         competitors = ", ".join(data.market_context.main_competitors)
         usp = data.product_definition.unique_selling_proposition
 
         return {
             "competitor_analysis": (
                 f"Analyze the current pricing, marketing messaging, and customer sentiment for these competitors "
-                f"in the {industry} space: {competitors}. Highlight their weaknesses."
+                f"in the {industry} space: {competitors}. Highlight their weaknesses and what gaps exist."
             ),
             "usp_validation": (
                 f"Search for consumer discussions and reviews regarding {industry} to interpret if this value "
                 f"proposition is truly unique or desired: '{usp}'. Are customers asking for this?"
             ),
             "social_sentiment": (
-                f"Search Reddit and social threads for recent 'talk' or honest opinions about '{brand}' "
+                f"Search Reddit and social threads for recent honest opinions about '{brand}' "
                 f"(if existing) or general frustrations with current solutions in the {industry} market."
+            ),
+            "brand_awareness": (
+                f"Search for how '{brand}' is currently perceived online in the {industry} market in {country}. "
+                f"Find brand mentions, customer reviews, ratings, and general online reputation. "
+                f"What is their current brand recognition level compared to established players?"
+            ),
+            "share_of_voice": (
+                f"Analyze the online share of voice for '{brand}' versus these competitors: {competitors} "
+                f"in the {industry} industry in {country}. "
+                f"Which brand dominates the conversation? What channels do competitors use to build brand awareness? "
+                f"Where is '{brand}' underrepresented?"
             ),
         }
 
