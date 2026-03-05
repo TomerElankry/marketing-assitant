@@ -38,8 +38,23 @@ const ResultsView: React.FC<ResultsViewProps> = ({ jobId }) => {
         });
     };
 
-    const handleDownload = () => {
-        window.location.href = `/api/v1/jobs/${jobId}/download`;
+    const [downloading, setDownloading] = useState(false);
+
+    const handleDownload = async () => {
+        setDownloading(true);
+        try {
+            const res = await api.get(`/jobs/${jobId}/download`, { responseType: 'blob' });
+            const url = URL.createObjectURL(res.data);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `marketing_strategy_${jobId}.pptx`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('Download failed', err);
+        } finally {
+            setDownloading(false);
+        }
     };
 
     if (isLoading) {
@@ -96,11 +111,15 @@ const ResultsView: React.FC<ResultsViewProps> = ({ jobId }) => {
 
                     <button
                         onClick={handleDownload}
-                        className="group inline-flex items-center gap-3 px-10 py-5 bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 hover:from-blue-500 hover:via-purple-500 hover:to-cyan-500 text-white font-bold text-lg rounded-full hover:scale-105 active:scale-95 transition-all glow-blue hover:glow-purple relative overflow-hidden"
+                        disabled={downloading}
+                        className="group inline-flex items-center gap-3 px-10 py-5 bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 hover:from-blue-500 hover:via-purple-500 hover:to-cyan-500 text-white font-bold text-lg rounded-full hover:scale-105 active:scale-95 transition-all glow-blue hover:glow-purple relative overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                         <span className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                        <Download size={24} className="relative z-10 group-hover:animate-bounce" />
-                        <span className="relative z-10">Download Presentation (.pptx)</span>
+                        {downloading
+                            ? <Loader2 size={24} className="relative z-10 animate-spin" />
+                            : <Download size={24} className="relative z-10 group-hover:animate-bounce" />
+                        }
+                        <span className="relative z-10">{downloading ? 'Preparing…' : 'Download Presentation (.pptx)'}</span>
                     </button>
                     <p className="text-xs text-slate-400 mt-3 font-mono">Ready for PowerPoint</p>
                 </div>

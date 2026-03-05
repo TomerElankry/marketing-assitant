@@ -18,11 +18,17 @@ class Settings(BaseSettings):
     GEMINI_API_KEY: str = ""
     PERPLEXITY_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
+    GROK_API_KEY: str = ""
+    NEWSAPI_KEY: str = ""
+    REDDIT_CLIENT_ID: str = ""
+    REDDIT_CLIENT_SECRET: str = ""
+    REDDIT_USER_AGENT: str = "MarketingAssistant/1.0"
 
     # AI Model names — override via env to swap versions without code changes
     GPT_MODEL: str = "gpt-4o"
     GEMINI_MODEL: str = "gemini-2.0-flash"
     PERPLEXITY_MODEL: str = "sonar"
+    GROK_MODEL: str = "grok-2-latest"
 
     # Storage
     MINIO_ENDPOINT: str = ""

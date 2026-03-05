@@ -18,6 +18,7 @@ from app.services.presentation_service import presentation_service
 from app.services.research_consolidator import research_consolidator
 from app.services.research_service import research_service
 from app.services.storage_service import storage_service
+from app.services.news_research_service import news_research_service
 
 logger = logging.getLogger(__name__)
 
@@ -55,14 +56,16 @@ async def perform_research_workflow(job_id: str, request_data: dict):
         job.status = JobStatus.RESEARCHING
         db.commit()
 
-        # 2. Run Triple Research in parallel with timeout:
+        # 2. Run Quad Research in parallel with timeout:
         #    - Perplexity: competitor data, USP validation, brand awareness, share of voice
         #    - Gemini: visual trends, cultural insights, campaign examples, content formats
         #    - Brand Audit: homepage scrape → current positioning, tone, gaps
-        #    Perplexity and Brand Audit are optional — failures degrade gracefully.
-        step = "triple_research"
+        #    - NewsAPI: press coverage, industry news, competitor announcements
+        #    All except Gemini are optional — failures degrade gracefully.
+        step = "quad_research"
         questionnaire = QuestionnaireRequest(**request_data)
-        logger.info(f"[Job {job_id}] Starting Triple Research (Perplexity + Gemini + Brand Audit)")
+        competitors = questionnaire.market_context.main_competitors or []
+        logger.info(f"[Job {job_id}] Starting Quad Research (Perplexity + Gemini + Brand Audit + News)")
 
         async def safe_perplexity():
             try:
@@ -81,11 +84,24 @@ async def perform_research_workflow(job_id: str, request_data: dict):
                 logger.warning(f"[Job {job_id}] Brand audit failed, continuing without it: {e}")
                 return {}
 
-        perplexity_results, gemini_results, brand_audit = await asyncio.wait_for(
+        async def safe_news_research():
+            try:
+                return await asyncio.to_thread(
+                    news_research_service.conduct_news_research,
+                    questionnaire.project_metadata.brand_name,
+                    questionnaire.project_metadata.industry,
+                    competitors,
+                )
+            except Exception as e:
+                logger.warning(f"[Job {job_id}] News research failed, continuing without it: {e}")
+                return {}
+
+        perplexity_results, gemini_results, brand_audit, news_results = await asyncio.wait_for(
             asyncio.gather(
                 safe_perplexity(),
                 gemini_research_service.conduct_creative_research(questionnaire),
                 safe_brand_audit(),
+                safe_news_research(),
             ),
             timeout=settings.RESEARCH_TIMEOUT,
         )
@@ -94,12 +110,14 @@ async def perform_research_workflow(job_id: str, request_data: dict):
             logger.warning(f"[Job {job_id}] Running in Gemini-only research mode")
         if not brand_audit:
             logger.warning(f"[Job {job_id}] Brand audit unavailable — proceeding without homepage data")
+        if not news_results:
+            logger.info(f"[Job {job_id}] News research unavailable (NEWSAPI_KEY not set or failed)")
 
         # 3. Consolidate Research
         step = "consolidation"
         logger.info(f"[Job {job_id}] Consolidating Research")
         consolidated_research = research_consolidator.consolidate_research(
-            perplexity_results, gemini_results, brand_audit
+            perplexity_results, gemini_results, brand_audit, news_results=news_results,
         )
 
         # 4. Persist Research artifacts
@@ -107,6 +125,7 @@ async def perform_research_workflow(job_id: str, request_data: dict):
         storage_service.upload_json(f"jobs/{job_id}/research_perplexity.json", perplexity_results)
         storage_service.upload_json(f"jobs/{job_id}/research_gemini.json", gemini_results)
         storage_service.upload_json(f"jobs/{job_id}/research_brand_audit.json", brand_audit)
+        storage_service.upload_json(f"jobs/{job_id}/research_news.json", news_results)
         storage_service.upload_json(f"jobs/{job_id}/research_consolidated.json", consolidated_research)
         logger.info(f"[Job {job_id}] Research artifacts saved")
 
@@ -132,7 +151,15 @@ async def perform_research_workflow(job_id: str, request_data: dict):
         # 7. Structure Slides
         step = "slide_structure"
         logger.info(f"[Job {job_id}] Structuring Slides")
-        slide_structure = presentation_service.structure_content(request_data, consensus_result)
+
+        # Enrich consensus result with research snapshots for richer slide copy
+        consensus_with_research = {
+            **consensus_result,
+            "perplexity_research_snapshot": perplexity_results,
+            "brand_audit_snapshot": brand_audit,
+            "news_snapshot": news_results,
+        }
+        slide_structure = presentation_service.structure_content(request_data, consensus_with_research)
         storage_service.upload_json(f"jobs/{job_id}/slides.json", slide_structure)
 
         # 8. Generate PPTX using a safe temp file

@@ -1,0 +1,40 @@
+{
+  "project_metadata": {
+    "brand_name": "Spotify",
+    "website_url": "https://www.spotify.com",
+    "target_country": "United States",
+    "industry": "Music & Audio Streaming / SaaS"
+  },
+  "product_definition": {
+    "product_description": "Spotify is the world's largest music and podcast streaming platform, offering on-demand access to over 100 million tracks, personalized playlists, and exclusive audio content — available free with ads or via Spotify Premium.",
+    "core_problem_solved": "Music discovery is overwhelming and fragmented; listeners waste time hunting for the right soundtrack for every mood, moment, and activity across multiple apps.",
+    "unique_selling_proposition": "Spotify doesn't just play music — it understands you. AI-powered personalization (Discover Weekly, Daylist, AI DJ) delivers the exact right sound for every moment of your life, before you even know you need it."
+  },
+  "target_audience": {
+    "demographics": "Gen Z and Millennials aged 16-35, predominantly urban and suburban. Secondary: podcast-heavy professionals aged 28-45 and family plan subscribers aged 30-50.",
+    "psychographics": "Identity-driven listeners who curate their personality through music; podcast enthusiasts seeking depth beyond mainstream media; commuters and gym-goers needing frictionless audio. Highly resistant to ads interrupting flow states.",
+    "cultural_nuances": "Audience is vocal about algorithmic fairness (artist pay debate); strong affinity for niche genres and underground artists; susceptible to FOMO around exclusive drops and early podcast releases. 'Spotify Wrapped' is a cultural ritual."
+  },
+  "market_context": {
+    "main_competitors": [
+      "Apple Music",
+      "YouTube Music",
+      "Amazon Music",
+      "Tidal",
+      "Deezer"
+    ],
+    "current_marketing_efforts": "Annual 'Spotify Wrapped' campaign, out-of-home billboard data stunts, podcast exclusives and originals, influencer co-playlists, app store optimization, and free-to-premium conversion email flows.",
+    "known_customer_objections": "Artists underpaid — guilt around using the platform; Apple Music perceived as higher audio quality; free tier ads are jarring and break immersion; Premium price feels unjustified vs. YouTube Music bundled with YouTube Premium."
+  },
+  "the_creative_goal": {
+    "primary_objective": "Convert free-tier users to Spotify Premium by making the value of uninterrupted, personalized listening feel emotionally indispensable — targeting a 15% uplift in free-to-paid conversion among 18-28 year olds.",
+    "desired_tone_of_voice": "Bold, Playful, Culturally Fluent, Intimate, and Unapologetically Human.",
+    "specific_channels": [
+      "TikTok",
+      "Instagram Stories & Reels",
+      "YouTube Pre-roll",
+      "Spotify In-App Banners",
+      "Out-of-Home (OOH) Digital"
+    ]
+  }
+}
