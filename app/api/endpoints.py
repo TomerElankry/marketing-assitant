@@ -56,7 +56,12 @@ async def create_job(
 
     new_job = Job(
         status=JobStatus.APPROVED,
-        project_metadata={"brand_name": brand_name},
+        project_metadata={
+            "brand_name": brand_name,
+            "industry": request.project_metadata.industry,
+            "target_country": request.project_metadata.target_country,
+            "primary_objective": request.the_creative_goal.primary_objective,
+        },
         user_id=current_user.id,
     )
     db.add(new_job)
@@ -104,6 +109,9 @@ def list_jobs(
             "job_id": str(j.id),
             "status": j.status,
             "brand_name": (j.project_metadata or {}).get("brand_name"),
+            "industry": (j.project_metadata or {}).get("industry"),
+            "target_country": (j.project_metadata or {}).get("target_country"),
+            "primary_objective": (j.project_metadata or {}).get("primary_objective"),
             "created_at": j.created_at,
             "updated_at": j.updated_at,
             "failed_step": j.failed_step,
@@ -139,6 +147,26 @@ def get_job_status(
         "error_message": job.error_message,
         "owner_id": str(job.user_id) if job.user_id else None,
     }
+
+
+@router.get("/jobs/{job_id}/questionnaire", summary="Get Job Questionnaire Input")
+def get_job_questionnaire(
+    job_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Returns the original questionnaire data submitted for a job."""
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if not current_user.is_admin and job.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorised to view this job")
+
+    storage_key = f"jobs/{job_id}/questionnaire.json"
+    data = storage_service.get_json(storage_key)
+    if not data:
+        raise HTTPException(status_code=404, detail="Questionnaire data not found")
+    return data
 
 
 @router.get("/jobs/{job_id}/analysis", summary="Get Analysis Results")

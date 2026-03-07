@@ -18,3 +18,4 @@ python-multipart==0.0.9
 email-validator==2.2.0
 newsapi-python==0.2.7
 praw==7.8.1
+google-auth==2.37.0

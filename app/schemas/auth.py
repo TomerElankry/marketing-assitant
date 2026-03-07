@@ -47,3 +47,7 @@ class AdminUserUpdate(BaseModel):
     is_active: Optional[bool] = None
     is_admin: Optional[bool] = None
     full_name: Optional[str] = None
+
+
+class GoogleTokenPayload(BaseModel):
+    credential: str

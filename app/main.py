@@ -20,8 +20,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create tables
-Base.metadata.create_all(bind=engine)
+# Create tables (checkfirst=True skips objects that already exist)
+Base.metadata.create_all(bind=engine, checkfirst=True)
 
 app = FastAPI(title=settings.PROJECT_NAME)
 

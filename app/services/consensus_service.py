@@ -31,7 +31,7 @@ class ConsensusService:
 
     @retry(
         retry=retry_if_exception_type(Exception),
-        wait=wait_exponential(multiplier=1, min=2, max=30),
+        wait=wait_exponential(multiplier=2, min=5, max=60),
         stop=stop_after_attempt(3),
         reraise=True,
     )
@@ -54,10 +54,14 @@ class ConsensusService:
                 "consensus_notes": "All three upstream analysis models returned errors.",
             }
 
+        def _compact(obj: dict, max_chars: int = 3000) -> str:
+            s = json.dumps(obj)
+            return s[:max_chars] + ("…" if len(s) > max_chars else "")
+
         user_content = (
-            f"# Proposal 1 (GPT-4o):\n{json.dumps(gpt4o, indent=2)}\n\n"
-            f"# Proposal 2 (Gemini):\n{json.dumps(gemini, indent=2)}\n\n"
-            f"# Proposal 3 (Perplexity):\n{json.dumps(perplexity, indent=2)}\n\n"
+            f"# Proposal 1 (GPT-4o):\n{_compact(gpt4o)}\n\n"
+            f"# Proposal 2 (Gemini):\n{_compact(gemini)}\n\n"
+            f"# Proposal 3 (Perplexity):\n{_compact(perplexity)}\n\n"
             "# Task\n"
             "Create a Final Consensus Strategy JSON with:\n"
             '1. "hooks": Select the top 5 hooks from ALL sources. Label each with its source.\n'

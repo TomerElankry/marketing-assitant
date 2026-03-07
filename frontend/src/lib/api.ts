@@ -14,5 +14,8 @@ api.interceptors.request.use((config) => {
     return config;
 });
 
+export const authGoogle = (credential: string) =>
+    api.post<{ access_token: string; user: import('../types').UserResponse }>('/auth/google', { credential });
+
 export { TOKEN_KEY };
 export default api;

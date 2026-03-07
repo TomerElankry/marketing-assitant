@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Creative Marketing Strategy Engine"
+    PROJECT_NAME: str = "PHIL"
     API_V1_STR: str = "/api/v1"
 
     # CORS — override via env: CORS_ALLOW_ORIGINS=http://localhost:5173,https://yourdomain.com
@@ -22,7 +22,7 @@ class Settings(BaseSettings):
     NEWSAPI_KEY: str = ""
     REDDIT_CLIENT_ID: str = ""
     REDDIT_CLIENT_SECRET: str = ""
-    REDDIT_USER_AGENT: str = "MarketingAssistant/1.0"
+    REDDIT_USER_AGENT: str = "PHIL/1.0"
 
     # AI Model names — override via env to swap versions without code changes
     GPT_MODEL: str = "gpt-4o"
@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     MINIO_ACCESS_KEY: str = ""
     MINIO_SECRET_KEY: str = ""
     MINIO_BUCKET: str = "marketing-artifacts"
+
+    # Google OAuth
+    GOOGLE_CLIENT_ID: str = ""
 
     # Auth / JWT
     SECRET_KEY: str = "changeme-generate-a-strong-secret-in-production"

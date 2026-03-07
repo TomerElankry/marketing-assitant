@@ -26,9 +26,10 @@ logger = logging.getLogger(__name__)
 SLIDE_W = 9_144_000
 SLIDE_H = 5_143_500
 
-# Shape type constants
-RECT       = 1   # MSO_AUTO_SHAPE_TYPE.RECTANGLE
-ROUND_RECT = 5   # MSO_AUTO_SHAPE_TYPE.ROUNDED_RECTANGLE
+from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE
+
+RECT       = MSO_AUTO_SHAPE_TYPE.RECTANGLE
+ROUND_RECT = MSO_AUTO_SHAPE_TYPE.ROUNDED_RECTANGLE
 
 
 class PresentationService:
@@ -173,12 +174,27 @@ Use news coverage and competitor press activity to ground claims in real evidenc
    {{"label": "VALUES", "header": "What we stand for", "items": ["Core value 1", "Core value 2", "Core value 3"]}},
    {{"label": "VOICE", "header": "How we sound", "items": ["Tone descriptor 1", "Tone descriptor 2", "What we never say", "Platform where voice shines"]}}]
 
-## SLIDE 10 — type: "content"  (Campaign barriers)
+## SLIDE 10 — type: "three_col"  (Campaign barriers)
 - title: "Barriers to Success"
-- content: 3 bullets, each naming a specific barrier:
-  (a) Market barrier — adoption challenge or trust gap (cite community/news data if available)
-  (b) Competitive barrier — specific competitor or category inertia
-  (c) Execution barrier — internal challenge {brand_name} must overcome
+- columns: exactly 3 objects, one per barrier type:
+  [{{"label": "MARKET BARRIER", "header": "Adoption & Trust Gap",
+    "items": [
+      "Specific adoption or trust challenge drawn from news/community research — name the root cause",
+      "A real data point or user sentiment that proves this barrier exists",
+      "Why standard marketing approaches fail to overcome it for {brand_name}"
+    ]}},
+   {{"label": "COMPETITIVE BARRIER", "header": "Competitor Inertia",
+    "items": [
+      "Name the specific competitor(s) creating this inertia and what advantage they hold",
+      "The switching cost or lock-in mechanism that keeps users from moving to {brand_name}",
+      "What {brand_name} must do differently to overcome this competitor advantage"
+    ]}},
+   {{"label": "EXECUTION BARRIER", "header": "Internal Challenge",
+    "items": [
+      "The internal capability or perception gap {brand_name} must close",
+      "Why this is specifically hard given {brand_name}'s current market position or brand history",
+      "The one lever {brand_name} can pull to address this from the inside out"
+    ]}}]
 
 ## SLIDE 11 — type: "campaign"
 - title: "Campaign: [TECHNIQUE]" — pick from: Viral Referral Loop / UGC Flywheel / Micro-Influencer Tier / Community-Led Growth / Social Proof Cascade / Challenge Campaign / Waitlist Launch / Paid-Organic Flywheel / Content-Led SEO / Partnership Co-Marketing
@@ -268,37 +284,39 @@ RULES:
             )
 
             slides = slides_data.get("slides", [])
+            total = len(slides)
             for idx, slide_info in enumerate(slides):
                 slide = prs.slides.add_slide(blank_layout)
                 stype = slide_info.get("type", "content")
+                num = idx + 1
 
                 if stype == "title":
-                    self._build_slide_title(slide, slide_info, theme)
+                    self._build_slide_title(slide, slide_info, theme, num, total)
                 elif stype == "company_intro":
-                    self._build_slide_company_intro(slide, slide_info, theme)
+                    self._build_slide_company_intro(slide, slide_info, theme, num, total)
                 elif stype == "two_by_two":
-                    self._build_slide_two_by_two(slide, slide_info, theme)
+                    self._build_slide_two_by_two(slide, slide_info, theme, num, total)
                 elif stype == "single_card":
-                    self._build_slide_single_card(slide, slide_info, theme)
+                    self._build_slide_single_card(slide, slide_info, theme, num, total)
                 elif stype == "three_col":
-                    self._build_slide_three_col(slide, slide_info, theme)
+                    self._build_slide_three_col(slide, slide_info, theme, num, total)
                 elif stype == "two_col":
-                    self._build_slide_two_col(slide, slide_info, theme)
+                    self._build_slide_two_col(slide, slide_info, theme, num, total)
                 elif stype == "persona_detail":
-                    self._build_slide_persona_detail(slide, slide_info, theme)
+                    self._build_slide_persona_detail(slide, slide_info, theme, num, total)
                 elif stype == "campaign":
-                    self._build_slide_campaign(slide, slide_info, theme)
+                    self._build_slide_campaign(slide, slide_info, theme, num, total)
                 elif stype == "campaign_examples":
-                    self._build_slide_campaign_examples(slide, slide_info, theme)
+                    self._build_slide_campaign_examples(slide, slide_info, theme, num, total)
                 elif stype == "hooks":
-                    self._build_slide_hooks(slide, slide_info, theme)
+                    self._build_slide_hooks(slide, slide_info, theme, num, total)
                 elif stype == "kpis":
-                    self._build_slide_kpis(slide, slide_info, theme)
+                    self._build_slide_kpis(slide, slide_info, theme, num, total)
                 elif stype in ("roadmap", "next_steps"):
-                    self._build_slide_roadmap(slide, slide_info, theme)
+                    self._build_slide_roadmap(slide, slide_info, theme, num, total)
                 else:
                     # "content", "social", and fallback
-                    self._build_slide_content(slide, slide_info, theme)
+                    self._build_slide_content(slide, slide_info, theme, num, total)
 
             prs.save(output_path)
             logger.info(f"PPTX saved to {output_path}")
@@ -426,6 +444,39 @@ RULES:
         fill.solid()
         fill.fore_color.rgb = color
 
+    def _add_bg_accent(self, slide, theme) -> None:
+        """
+        Adds a subtle geometric depth panel to the bottom-right of a content slide.
+        For dark themes: slightly lighter rectangle. For light themes: slightly darker.
+        """
+        from pptx.dml.color import RGBColor
+        bg = theme["bg"]
+        r, g, b = bg.rgb >> 16, (bg.rgb >> 8) & 0xFF, bg.rgb & 0xFF
+        if theme["dark_theme"]:
+            nr = min(255, r + 22)
+            ng = min(255, g + 22)
+            nb = min(255, b + 32)
+        else:
+            nr = max(0, r - 14)
+            ng = max(0, g - 14)
+            nb = max(0, b - 14)
+        depth_color = RGBColor(nr, ng, nb)
+        w = int(SLIDE_W * 0.42)
+        h = int(SLIDE_H * 0.55)
+        self._add_rect(slide, SLIDE_W - w, SLIDE_H - h, w, h, depth_color)
+
+    def _add_slide_counter(self, slide, num: int, total: int, theme: dict) -> None:
+        """Adds a small slide counter badge (e.g. '03 / 16') in the bottom-right corner."""
+        badge_w = int(SLIDE_W * 0.095)
+        badge_h = int(SLIDE_H * 0.052)
+        badge_l = SLIDE_W - badge_w - int(SLIDE_W * 0.018)
+        badge_t = SLIDE_H - badge_h - int(SLIDE_H * 0.022)
+        self._add_rounded_rect(slide, badge_l, badge_t, badge_w, badge_h, theme["card_bg"], corner=0.3)
+        self._add_textbox(
+            slide, badge_l, badge_t, badge_w, badge_h,
+            f"{num:02d} / {total:02d}", 9, theme["muted"], bold=True,
+        )
+
     def _add_rect(self, slide, left, top, width, height, fill_color):
         from pptx.util import Emu
         shape = slide.shapes.add_shape(
@@ -459,6 +510,7 @@ RULES:
         text: str, font_size: float, font_color,
         bold: bool = False, italic: bool = False,
         word_wrap: bool = True,
+        vertical_anchor=None,
     ):
         from pptx.util import Emu, Pt
         txBox = slide.shapes.add_textbox(
@@ -467,6 +519,8 @@ RULES:
         )
         tf = txBox.text_frame
         tf.word_wrap = word_wrap
+        if vertical_anchor is not None:
+            tf.vertical_anchor = vertical_anchor
         p = tf.paragraphs[0]
         run = p.add_run()
         run.text = str(text) if text else ""
@@ -476,11 +530,12 @@ RULES:
         run.font.italic = italic
         return tf
 
-    def _add_slide_header(self, slide, title: str, theme: dict) -> None:
+    def _add_slide_header(self, slide, title: str, theme: dict, section_label: str = "") -> None:
         """
         Consistent slide header for all content slides:
           - Full-width primary stripe at top (thin)
           - Slide title (left, 26pt bold, text_main)
+          - Section label pill (next to title, colored)
           - Brand name (right, 12pt bold, muted)
           - Full-width rule below header area
         """
@@ -494,10 +549,22 @@ RULES:
         self._add_textbox(
             slide,
             left=margin, top=header_top,
-            width=int(SLIDE_W * 0.68), height=int(SLIDE_H * 0.14),
+            width=int(SLIDE_W * 0.58), height=int(SLIDE_H * 0.14),
             text=title,
             font_size=26, font_color=theme["text_main"], bold=True,
         )
+        # Section label pill (positioned to the right of title area)
+        if section_label:
+            pill_w = int(SLIDE_W * 0.115)
+            pill_h = int(SLIDE_H * 0.052)
+            pill_l = int(SLIDE_W * 0.645)
+            pill_t = header_top + int(SLIDE_H * 0.042)
+            self._add_rounded_rect(slide, pill_l, pill_t, pill_w, pill_h, theme["accent"], corner=0.3)
+            self._add_textbox(
+                slide, pill_l + int(SLIDE_W * 0.006), pill_t + int(SLIDE_H * 0.008),
+                pill_w - int(SLIDE_W * 0.008), pill_h,
+                section_label, 8, theme["text_light"], bold=True,
+            )
         # Brand name (top-right)
         self._add_textbox(
             slide,
@@ -579,8 +646,9 @@ RULES:
     # SLIDE BUILDERS
     # =========================================================================
 
-    def _build_slide_title(self, slide, slide_info: dict, theme: dict) -> None:
-        """Title slide: left accent sidebar + brand name + campaign title + subtitle."""
+    def _build_slide_title(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
+        """Title slide: left accent sidebar + freeform geometric triangle (top-right) + brand name + campaign title + subtitle."""
+        from pptx.util import Emu
         self._set_background(slide, theme["bg"])
 
         sidebar_w = int(SLIDE_W * 0.20)
@@ -588,8 +656,32 @@ RULES:
         self._add_rect(slide, 0, 0, sidebar_w, SLIDE_H, theme["accent"])
         self._add_rect(slide, sidebar_w - stripe_w, 0, stripe_w, SLIDE_H, theme["primary"])
 
+        # Freeform geometric triangle accent — top-right corner
+        try:
+            builder = slide.shapes.build_freeform(SLIDE_W, 0)
+            builder.add_line_to(SLIDE_W, int(SLIDE_H * 0.62))
+            builder.add_line_to(int(SLIDE_W * 0.58), 0)
+            tri = builder.convert_to_shape()
+            tri.fill.solid()
+            tri.fill.fore_color.rgb = theme["primary"]
+            tri.line.fill.background()
+        except Exception:
+            pass
+
+        # Smaller secondary triangle overlay (accent color, more opaque feel)
+        try:
+            builder2 = slide.shapes.build_freeform(SLIDE_W, 0)
+            builder2.add_line_to(SLIDE_W, int(SLIDE_H * 0.38))
+            builder2.add_line_to(int(SLIDE_W * 0.75), 0)
+            tri2 = builder2.convert_to_shape()
+            tri2.fill.solid()
+            tri2.fill.fore_color.rgb = theme["accent"]
+            tri2.line.fill.background()
+        except Exception:
+            pass
+
         content_left = int(SLIDE_W * 0.23)
-        content_w    = int(SLIDE_W * 0.73)
+        content_w    = int(SLIDE_W * 0.50)
 
         self._add_textbox(
             slide, content_left, int(SLIDE_H * 0.08), content_w, int(SLIDE_H * 0.12),
@@ -614,14 +706,17 @@ RULES:
                 slide, content_left, int(SLIDE_H * 0.87), content_w, int(SLIDE_H * 0.08),
                 theme["website_url"], 10, theme["muted"],
             )
+        self._add_slide_counter(slide, slide_num, total_slides, theme)
 
-    def _build_slide_company_intro(self, slide, slide_info: dict, theme: dict) -> None:
+    def _build_slide_company_intro(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """
         Company intro: left 43% = headline + description with left bar,
                        right 52% = 3 stacked KVP cards.
         """
         self._set_background(slide, theme["bg"])
-        self._add_slide_header(slide, slide_info.get("title", "About The Company"), theme)
+        self._add_bg_accent(slide, theme)
+        self._add_slide_header(slide, slide_info.get("title", "About The Company"), theme, "OVERVIEW")
+        self._add_slide_counter(slide, slide_num, total_slides, theme)
 
         margin      = int(SLIDE_W * 0.05)
         content_top = int(SLIDE_H * 0.22)
@@ -675,10 +770,12 @@ RULES:
             self._add_textbox(slide, pad_l, mid, cw, int(SLIDE_H * 0.07), label, 9, accent, bold=True)
             self._add_textbox(slide, pad_l, mid + int(SLIDE_H * 0.07), cw, int(SLIDE_H * 0.13), desc_kv, 13, theme["text_main"], bold=True)
 
-    def _build_slide_two_by_two(self, slide, slide_info: dict, theme: dict) -> None:
+    def _build_slide_two_by_two(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """2×2 grid of labeled cards."""
         self._set_background(slide, theme["bg"])
-        self._add_slide_header(slide, slide_info.get("title", ""), theme)
+        self._add_bg_accent(slide, theme)
+        self._add_slide_header(slide, slide_info.get("title", ""), theme, "MARKET")
+        self._add_slide_counter(slide, slide_num, total_slides, theme)
 
         margin     = int(SLIDE_W * 0.04)
         c_top      = int(SLIDE_H * 0.215)
@@ -706,10 +803,11 @@ RULES:
                 accent_color=accent_colors[i],
             )
 
-    def _build_slide_single_card(self, slide, slide_info: dict, theme: dict) -> None:
+    def _build_slide_single_card(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """Single large centered card for a focused challenge or key message."""
         self._set_background(slide, theme["bg"])
-        self._add_slide_header(slide, slide_info.get("title", ""), theme)
+        self._add_bg_accent(slide, theme)
+        self._add_slide_header(slide, slide_info.get("title", ""), theme, "CHALLENGE")
 
         margin = int(SLIDE_W * 0.06)
         c_top  = int(SLIDE_H * 0.225)
@@ -718,6 +816,22 @@ RULES:
 
         # Card background
         self._add_rounded_rect(slide, margin, c_top, c_w, c_h, theme["card_bg"])
+
+        # Large decorative brand initial watermark (bottom-right of card)
+        initial = theme["brand_name"][:1].upper() if theme["brand_name"] else ""
+        if initial:
+            from pptx.dml.color import RGBColor
+            card_bg = theme["card_bg"]
+            r = min(255, (card_bg.rgb >> 16) + 28)
+            g = min(255, ((card_bg.rgb >> 8) & 0xFF) + 28)
+            b = min(255, (card_bg.rgb & 0xFF) + 35)
+            watermark_color = RGBColor(r, g, b)
+            self._add_textbox(
+                slide,
+                left=margin + int(c_w * 0.62), top=c_top + int(c_h * 0.22),
+                width=int(c_w * 0.36), height=int(c_h * 0.72),
+                text=initial, font_size=180, font_color=watermark_color, bold=True,
+            )
 
         # Left accent border
         border_w = int(SLIDE_W * 0.007)
@@ -768,11 +882,14 @@ RULES:
             slide, margin, int(SLIDE_H * 0.91), SLIDE_W - 2 * margin, int(SLIDE_H * 0.06),
             theme["brand_name"], 9, theme["muted"],
         )
+        self._add_slide_counter(slide, slide_num, total_slides, theme)
 
-    def _build_slide_three_col(self, slide, slide_info: dict, theme: dict) -> None:
+    def _build_slide_three_col(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """3-column card layout (audience, barriers, etc.)."""
         self._set_background(slide, theme["bg"])
-        self._add_slide_header(slide, slide_info.get("title", ""), theme)
+        self._add_bg_accent(slide, theme)
+        self._add_slide_header(slide, slide_info.get("title", ""), theme, "STRATEGY")
+        self._add_slide_counter(slide, slide_num, total_slides, theme)
 
         margin  = int(SLIDE_W * 0.04)
         c_top   = int(SLIDE_H * 0.215)
@@ -874,7 +991,7 @@ RULES:
         except Exception as e:
             logger.debug(f"Circle crop failed: {e}")
 
-    def _build_slide_persona_detail(self, slide, slide_info: dict, theme: dict) -> None:
+    def _build_slide_persona_detail(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """
         Detailed persona profile slide:
           Left panel  (~30 % width): circular photo · name · role · company · tags · quote
@@ -883,7 +1000,9 @@ RULES:
         from pptx.util import Emu
 
         self._set_background(slide, theme["bg"])
-        self._add_slide_header(slide, slide_info.get("title", "Target Audience"), theme)
+        self._add_bg_accent(slide, theme)
+        self._add_slide_header(slide, slide_info.get("title", "Target Audience"), theme, "AUDIENCE")
+        self._add_slide_counter(slide, slide_num, total_slides, theme)
 
         # Subtitle line (persona category) sits just below the header rule
         subtitle = slide_info.get("subtitle", "")
@@ -958,15 +1077,21 @@ RULES:
                 )
             y += pill_h + int(SLIDE_H * 0.022)
 
-        # Divider + "Quote" label + quote text
-        self._add_rect(slide, lx, y, lw, int(SLIDE_H * 0.003), theme["muted"])
-        y += int(SLIDE_H * 0.018)
-        self._add_textbox(slide, lx, y, lw, int(SLIDE_H * 0.048), "Quote", 9, theme["muted"])
-        y += int(SLIDE_H * 0.048)
+        # Divider + "Quote" label + quote text — pinned to bottom of left panel
         quote = slide_info.get("quote", "")
         if quote:
-            avail = (c_top + c_h) - y - int(SLIDE_H * 0.02)
-            self._add_textbox(slide, lx, y, lw, avail, f'"{quote}"', 10, theme["text_main"], italic=True)
+            quote_h   = int(SLIDE_H * 0.10)
+            label_h   = int(SLIDE_H * 0.04)
+            rule_h    = int(SLIDE_H * 0.003)
+            pad       = int(SLIDE_H * 0.02)
+            divider_t = (c_top + c_h) - quote_h - label_h - rule_h - int(SLIDE_H * 0.015) - pad
+            if divider_t > y:  # only draw if content above doesn't overlap
+                self._add_rect(slide, lx, divider_t, lw, rule_h, theme["muted"])
+                label_t = divider_t + rule_h + int(SLIDE_H * 0.012)
+                self._add_textbox(slide, lx, label_t, lw, label_h, "Quote", 9, theme["muted"])
+                quote_t = label_t + label_h
+                self._add_textbox(slide, lx, quote_t, lw, quote_h,
+                                  f'"{quote}"', 10, theme["text_main"], italic=True)
 
         # ── Right panel: 2×2 card grid ──────────────────────────────────────────
         cards   = slide_info.get("cards", [])
@@ -992,11 +1117,13 @@ RULES:
             icon_t  = ct + int(SLIDE_H * 0.03)
             self._add_rounded_rect(slide, icon_l, icon_t, icon_sz, icon_sz, ac, corner=0.2)
 
-            # Card title (right of icon)
+            # Card title (right of icon) — vertically centred with the icon square
+            from pptx.enum.text import MSO_ANCHOR
             title_l = icon_l + icon_sz + int(SLIDE_W * 0.012)
             title_w = card_w - icon_sz - int(SLIDE_W * 0.035)
-            self._add_textbox(slide, title_l, icon_t, title_w, int(SLIDE_H * 0.12),
-                               card.get("label", ""), 13, theme["text_main"], bold=True)
+            self._add_textbox(slide, title_l, icon_t, title_w, icon_sz,
+                               card.get("label", ""), 13, theme["text_main"], bold=True,
+                               vertical_anchor=MSO_ANCHOR.MIDDLE)
 
             # Horizontal rule below icon row
             rule_t = ct + int(SLIDE_H * 0.175)
@@ -1040,7 +1167,7 @@ RULES:
             logger.warning(f"Persona image generation failed for '{name}': {e}")
             return None
 
-    def _build_slide_persona(self, slide, slide_info: dict, theme: dict) -> None:
+    def _build_slide_persona(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """
         Persona slide: each card has an AI-generated portrait photo at the top,
         name + bullet items below. Both images are generated in parallel.
@@ -1049,7 +1176,9 @@ RULES:
         from pptx.util import Emu
 
         self._set_background(slide, theme["bg"])
-        self._add_slide_header(slide, slide_info.get("title", "Target Personas"), theme)
+        self._add_bg_accent(slide, theme)
+        self._add_slide_header(slide, slide_info.get("title", "Target Personas"), theme, "AUDIENCE")
+        self._add_slide_counter(slide, slide_num, total_slides, theme)
 
         margin = int(SLIDE_W * 0.04)
         c_top  = int(SLIDE_H * 0.215)
@@ -1129,10 +1258,12 @@ RULES:
                         f"• {item}", 9, theme["muted"],
                     )
 
-    def _build_slide_two_col(self, slide, slide_info: dict, theme: dict) -> None:
+    def _build_slide_two_col(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """Two-column card comparison."""
         self._set_background(slide, theme["bg"])
-        self._add_slide_header(slide, slide_info.get("title", ""), theme)
+        self._add_bg_accent(slide, theme)
+        self._add_slide_header(slide, slide_info.get("title", ""), theme, "COMPETITIVE")
+        self._add_slide_counter(slide, slide_num, total_slides, theme)
 
         margin  = int(SLIDE_W * 0.04)
         c_top   = int(SLIDE_H * 0.215)
@@ -1158,10 +1289,12 @@ RULES:
             accent_color=theme["accent"],
         )
 
-    def _build_slide_content(self, slide, slide_info: dict, theme: dict) -> None:
+    def _build_slide_content(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """Standard content slide with consistent header + bullet cards."""
         self._set_background(slide, theme["bg"])
+        self._add_bg_accent(slide, theme)
         self._add_slide_header(slide, slide_info.get("title", ""), theme)
+        self._add_slide_counter(slide, slide_num, total_slides, theme)
 
         margin    = int(SLIDE_W * 0.05)
         c_top     = int(SLIDE_H * 0.22)
@@ -1179,7 +1312,8 @@ RULES:
         for i, bullet in enumerate(bullets[:4]):
             bt     = c_top + i * (row_h + gap)
             pip_sz = int(SLIDE_H * 0.022)
-            pip_t  = bt + int((row_h - pip_sz) / 2)
+            # Align pip with first line of text (text anchors to top of box)
+            pip_t  = bt + int(SLIDE_H * 0.01)
             pip_gap = int(SLIDE_W * 0.018)
 
             self._add_rect(slide, margin, pip_t, pip_sz, pip_sz, theme["accent"])
@@ -1196,10 +1330,11 @@ RULES:
             theme["brand_name"], 9, theme["muted"],
         )
 
-    def _build_slide_campaign(self, slide, slide_info: dict, theme: dict) -> None:
-        """Campaign concept slide with technique badge + numbered tactic markers."""
+    def _build_slide_campaign(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
+        """Campaign concept slide with technique badge + numbered tactic markers + step connector."""
         self._set_background(slide, theme["bg"])
-        self._add_slide_header(slide, slide_info.get("title", ""), theme)
+        self._add_bg_accent(slide, theme)
+        self._add_slide_header(slide, slide_info.get("title", ""), theme, "CAMPAIGN")
 
         margin    = int(SLIDE_W * 0.05)
         c_top     = int(SLIDE_H * 0.215)
@@ -1241,6 +1376,21 @@ RULES:
         text_left = margin + num_sz + int(SLIDE_W * 0.018)
         text_w    = content_w - num_sz - int(SLIDE_W * 0.018)
 
+        # Draw horizontal step connector line before bullets (connecting number badges)
+        if n > 1:
+            connector_y = c_top + int(row_h * 0.5) + int(num_sz * 0.5)
+            connector_x1 = margin + num_sz
+            connector_x2 = margin + num_sz + int(SLIDE_W * 0.0015)
+            # Line spanning from first to last badge center
+            last_num_rt = c_top + (n - 1) * row_h + int((row_h - num_sz) / 2) + int(num_sz * 0.5)
+            line_h = last_num_rt - connector_y
+            if line_h > 0:
+                self._add_rect(
+                    slide,
+                    margin + int(num_sz * 0.48), connector_y,
+                    int(SLIDE_W * 0.003), line_h, theme["secondary"],
+                )
+
         for i, bullet in enumerate(bullets[:3]):
             rt       = c_top + i * row_h
             num_rt   = rt + int((row_h - num_sz) / 2)
@@ -1259,14 +1409,17 @@ RULES:
             slide, margin, int(SLIDE_H * 0.92), int(SLIDE_W * 0.40), int(SLIDE_H * 0.06),
             theme["brand_name"], 9, theme["muted"],
         )
+        self._add_slide_counter(slide, slide_num, total_slides, theme)
 
-    def _build_slide_campaign_examples(self, slide, slide_info: dict, theme: dict) -> None:
+    def _build_slide_campaign_examples(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """
         Two real company campaign examples side by side.
         Each card: company + technique badge + strategy name + 3 checkmark items.
         """
         self._set_background(slide, theme["bg"])
-        self._add_slide_header(slide, slide_info.get("title", "Campaign Inspiration"), theme)
+        self._add_bg_accent(slide, theme)
+        self._add_slide_header(slide, slide_info.get("title", "Campaign Inspiration"), theme, "CAMPAIGN")
+        self._add_slide_counter(slide, slide_num, total_slides, theme)
 
         margin  = int(SLIDE_W * 0.04)
         c_top   = int(SLIDE_H * 0.215)
@@ -1345,10 +1498,11 @@ RULES:
                     item, 12, theme["text_main"], bold=True,
                 )
 
-    def _build_slide_hooks(self, slide, slide_info: dict, theme: dict) -> None:
-        """Marketing Hooks slide: alternating colored callout boxes."""
+    def _build_slide_hooks(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
+        """Marketing Hooks slide: alternating colored callout boxes + oversized quote decoration."""
         self._set_background(slide, theme["bg"])
-        self._add_slide_header(slide, slide_info.get("title", "Marketing Hooks"), theme)
+        self._add_bg_accent(slide, theme)
+        self._add_slide_header(slide, slide_info.get("title", "Marketing Hooks"), theme, "HOOKS")
 
         margin    = int(SLIDE_W * 0.05)
         c_top     = int(SLIDE_H * 0.215)
@@ -1356,7 +1510,17 @@ RULES:
         hooks     = slide_info.get("content", [])
         n         = min(len(hooks), 5)
 
+        # Oversized decorative opening quote mark behind hooks list
+        self._add_textbox(
+            slide,
+            left=int(SLIDE_W * 0.72), top=int(SLIDE_H * 0.18),
+            width=int(SLIDE_W * 0.24), height=int(SLIDE_H * 0.45),
+            text="\u201c", font_size=220, font_color=theme["primary"],
+            bold=True,
+        )
+
         if n == 0:
+            self._add_slide_counter(slide, slide_num, total_slides, theme)
             return
 
         gap   = int(SLIDE_H * 0.016)
@@ -1385,14 +1549,16 @@ RULES:
             slide, margin, int(SLIDE_H * 0.93), int(SLIDE_W * 0.40), int(SLIDE_H * 0.06),
             theme["brand_name"], 9, theme["muted"],
         )
+        self._add_slide_counter(slide, slide_num, total_slides, theme)
 
-    def _build_slide_kpis(self, slide, slide_info: dict, theme: dict) -> None:
+    def _build_slide_kpis(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """
-        KPI / Evaluation slide: 3 columns, each with big numbers + labels.
+        KPI / Evaluation slide: 3 columns, each with big numbers + labels + progress bars.
         Layout mirrors reference deck Awareness / Engagement / Conversion.
         """
         self._set_background(slide, theme["bg"])
-        self._add_slide_header(slide, slide_info.get("title", "KPI's"), theme)
+        self._add_bg_accent(slide, theme)
+        self._add_slide_header(slide, slide_info.get("title", "KPI's"), theme, "KPI'S")
 
         margin  = int(SLIDE_W * 0.04)
         c_top   = int(SLIDE_H * 0.215)
@@ -1448,13 +1614,22 @@ RULES:
                 # Big number
                 self._add_textbox(
                     slide, cl + int(SLIDE_W * 0.015), mt,
-                    card_w - int(SLIDE_W * 0.03), int(SLIDE_H * 0.16),
+                    card_w - int(SLIDE_W * 0.03), int(SLIDE_H * 0.13),
                     m.get("number", ""), 28, theme["text_main"], bold=True,
                 )
+                # Progress bar strip (below the number)
+                bar_t   = mt + int(SLIDE_H * 0.128)
+                bar_w   = card_w - int(SLIDE_W * 0.03)
+                bar_h   = int(SLIDE_H * 0.018)
+                bar_l   = cl + int(SLIDE_W * 0.015)
+                # Background track
+                self._add_rounded_rect(slide, bar_l, bar_t, bar_w, bar_h, theme["card_bg"], corner=0.3)
+                # Filled portion (~65% as visual indicator)
+                self._add_rounded_rect(slide, bar_l, bar_t, int(bar_w * 0.65), bar_h, accent, corner=0.3)
                 # Description
                 self._add_textbox(
-                    slide, cl + int(SLIDE_W * 0.015), mt + int(SLIDE_H * 0.14),
-                    card_w - int(SLIDE_W * 0.03), int(SLIDE_H * 0.07),
+                    slide, cl + int(SLIDE_W * 0.015), bar_t + bar_h + int(SLIDE_H * 0.008),
+                    card_w - int(SLIDE_W * 0.03), int(SLIDE_H * 0.065),
                     m.get("desc", ""), 9, theme["muted"],
                 )
                 # Divider between metrics
@@ -1465,10 +1640,14 @@ RULES:
                         card_w - int(SLIDE_W * 0.03), int(SLIDE_H * 0.003), theme["muted"],
                     )
 
-    def _build_slide_roadmap(self, slide, slide_info: dict, theme: dict) -> None:
+        self._add_slide_counter(slide, slide_num, total_slides, theme)
+
+    def _build_slide_roadmap(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """Execution roadmap — 3-phase grid + channel pills."""
         self._set_background(slide, theme["bg"])
-        self._add_slide_header(slide, slide_info.get("title", "Execution Roadmap"), theme)
+        self._add_bg_accent(slide, theme)
+        self._add_slide_header(slide, slide_info.get("title", "Execution Roadmap"), theme, "ROADMAP")
+        self._add_slide_counter(slide, slide_num, total_slides, theme)
 
         phases = slide_info.get("phases", [])
         if phases:

@@ -41,8 +41,6 @@ type FormData = z.infer<typeof schema>;
 interface StepDef {
     label: string;
     subtitle: string;
-    color: string;
-    accentColor: string;
     fields: string[];
 }
 
@@ -50,8 +48,6 @@ const STEPS: StepDef[] = [
     {
         label: "Project",
         subtitle: "Basic brand info",
-        color: "blue",
-        accentColor: "text-blue-400",
         fields: [
             "project_metadata.brand_name",
             "project_metadata.website_url",
@@ -62,8 +58,6 @@ const STEPS: StepDef[] = [
     {
         label: "Product",
         subtitle: "What you're selling",
-        color: "purple",
-        accentColor: "text-purple-400",
         fields: [
             "product_definition.product_description",
             "product_definition.core_problem_solved",
@@ -73,8 +67,6 @@ const STEPS: StepDef[] = [
     {
         label: "Audience",
         subtitle: "Who you're targeting",
-        color: "cyan",
-        accentColor: "text-cyan-400",
         fields: [
             "target_audience.demographics",
             "target_audience.psychographics",
@@ -83,15 +75,11 @@ const STEPS: StepDef[] = [
     {
         label: "Market",
         subtitle: "Competitive landscape",
-        color: "blue",
-        accentColor: "text-blue-400",
         fields: ["market_context.main_competitors"],
     },
     {
         label: "Goals",
         subtitle: "Creative direction",
-        color: "purple",
-        accentColor: "text-purple-400",
         fields: [
             "the_creative_goal.primary_objective",
             "the_creative_goal.desired_tone_of_voice",
@@ -101,18 +89,22 @@ const STEPS: StepDef[] = [
 ];
 
 interface JobFormProps {
-    onJobCreated: (jobId: string, brandName: string) => void;
+    onJobCreated: (jobId: string) => void;
+    initialData?: FormData;
 }
 
-const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
+const JobForm: React.FC<JobFormProps> = ({ onJobCreated, initialData }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const isEditing = !!initialData;
     const [currentStep, setCurrentStep] = useState(0);
-    const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
+    const [completedSteps, setCompletedSteps] = useState<Set<number>>(
+        isEditing ? new Set([0, 1, 2, 3, 4]) : new Set()
+    );
 
     const { register, control, handleSubmit, trigger, reset, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(schema),
-        defaultValues: {
+        defaultValues: initialData ?? {
             project_metadata: { brand_name: '', website_url: '', target_country: '', industry: '' },
             product_definition: { product_description: '', core_problem_solved: '', unique_selling_proposition: '' },
             target_audience: { demographics: '', psychographics: '', cultural_nuances: '' },
@@ -133,9 +125,7 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
         }
     };
 
-    const handleBack = () => {
-        setCurrentStep(s => s - 1);
-    };
+    const handleBack = () => setCurrentStep(s => s - 1);
 
     const onSubmit = async (data: FormData) => {
         setLoading(true);
@@ -143,10 +133,9 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
         try {
             const response = await api.post('/jobs', data);
             if (response.status === 201) {
-                onJobCreated(response.data.job_id, data.project_metadata.brand_name);
+                onJobCreated(response.data.job_id);
             }
         } catch (err: any) {
-            console.error(err);
             if (axios.isAxiosError(err)) {
                 const msg = err.response?.data?.detail
                     ? JSON.stringify(err.response.data.detail)
@@ -183,23 +172,30 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
         e.target.value = '';
     };
 
-    const stepBorderColors = ['border-blue-500/50', 'border-purple-500/50', 'border-cyan-500/50', 'border-blue-500/50', 'border-purple-500/50'];
-    const stepBgColors = ['bg-blue-500/20', 'bg-purple-500/20', 'bg-cyan-500/20', 'bg-blue-500/20', 'bg-purple-500/20'];
-    const stepTextColors = ['text-blue-400', 'text-purple-400', 'text-cyan-400', 'text-blue-400', 'text-purple-400'];
+    const stepTitles = [
+        "Project Metadata",
+        "Product Definition",
+        "Target Audience",
+        "Market Context",
+        "Creative Goal",
+    ];
 
     return (
-        <div className="max-w-3xl mx-auto relative">
+        <div className="max-w-2xl mx-auto">
 
-            {/* Import JSON button - top right */}
+            {/* Import JSON */}
             <div className="flex justify-end mb-4">
                 <input type="file" accept=".json,application/json" onChange={handleFileUpload} className="hidden" id="file-upload" />
-                <label htmlFor="file-upload" className="flex items-center gap-2 px-4 py-2 glass hover:glow-blue rounded-lg cursor-pointer transition-all text-sm font-medium border border-slate-600/50 hover:border-blue-500/50">
-                    <Upload size={16} /> Import JSON
+                <label
+                    htmlFor="file-upload"
+                    className="btn-ghost text-xs cursor-pointer"
+                >
+                    <Upload size={13} /> Import JSON
                 </label>
             </div>
 
-            {/* Step Progress Bar */}
-            <div className="mb-8 glass-strong rounded-2xl border border-slate-700/50 p-6">
+            {/* Step Progress */}
+            <div className="warm-card mb-6 p-5">
                 <div className="flex items-center justify-between">
                     {STEPS.map((step, index) => {
                         const isCompleted = completedSteps.has(index);
@@ -209,207 +205,207 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
                             <React.Fragment key={index}>
                                 <button
                                     type="button"
-                                    onClick={() => {
-                                        if (isCompleted || index < currentStep) setCurrentStep(index);
-                                    }}
-                                    className={`flex flex-col items-center gap-1.5 group transition-all ${isFuture ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}
+                                    onClick={() => { if (isCompleted || index < currentStep) setCurrentStep(index); }}
                                     disabled={isFuture}
+                                    className={`flex flex-col items-center gap-1.5 transition-all ${isFuture ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}
                                 >
                                     <div className={`
-                                        w-10 h-10 rounded-xl flex items-center justify-center border-2 transition-all duration-300 text-sm font-bold
+                                        w-9 h-9 rounded-xl flex items-center justify-center border-2 transition-all duration-300 text-sm font-bold
                                         ${isCompleted
-                                            ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400'
+                                            ? 'bg-emerald-50 border-emerald-400 text-emerald-600'
                                             : isActive
-                                                ? `${stepBgColors[index]} ${stepBorderColors[index]} ${stepTextColors[index]} scale-110`
-                                                : 'glass border-slate-700/50 text-slate-500'}
+                                                ? 'bg-[#1E3A5F]/8 border-[#1E3A5F] text-[#1E3A5F] scale-110'
+                                                : 'bg-white border-[#E7E5E4] text-[#A8A29E]'}
                                     `}>
-                                        {isCompleted
-                                            ? <CheckCircle2 size={18} />
-                                            : <span>{index + 1}</span>
-                                        }
+                                        {isCompleted ? <CheckCircle2 size={16} /> : <span>{index + 1}</span>}
                                     </div>
                                     <div className="text-center hidden sm:block">
-                                        <p className={`text-xs font-semibold ${isActive ? stepTextColors[index] : isCompleted ? 'text-emerald-400' : 'text-slate-500'}`}>
+                                        <p className={`text-xs font-semibold ${isActive ? 'text-[#1E3A5F]' : isCompleted ? 'text-emerald-600' : 'text-[#A8A29E]'}`}>
                                             {step.label}
                                         </p>
-                                        <p className="text-[10px] text-slate-600">{step.subtitle}</p>
+                                        <p className="text-[10px] text-[#C4B5A0]">{step.subtitle}</p>
                                     </div>
                                 </button>
                                 {index < STEPS.length - 1 && (
-                                    <div className={`flex-1 h-0.5 mx-2 rounded-full transition-all duration-500 ${completedSteps.has(index) ? 'bg-emerald-500/50' : 'bg-slate-700/50'}`} />
+                                    <div className={`flex-1 h-0.5 mx-2 rounded-full transition-all duration-500 ${completedSteps.has(index) ? 'bg-emerald-300' : 'bg-[#E7E5E4]'}`} />
                                 )}
                             </React.Fragment>
                         );
                     })}
                 </div>
-                <div className="mt-4 text-center">
-                    <span className="text-xs font-mono text-slate-500">Step {currentStep + 1} of {STEPS.length}</span>
-                </div>
+                <p className="text-center text-xs text-[#A8A29E] mt-4">Step {currentStep + 1} of {STEPS.length}</p>
             </div>
 
             {/* Form Panel */}
-            <form onSubmit={handleSubmit(onSubmit, (e) => console.log("Validation Errors:", e))}>
-                <div className={`p-8 glass-strong rounded-2xl border scan-line relative overflow-hidden ${stepBorderColors[currentStep]} transition-all duration-300`}>
-                    <div className="absolute inset-0 holographic opacity-20 pointer-events-none"></div>
-                    <div className="relative z-10 space-y-6">
+            <form onSubmit={handleSubmit(onSubmit)}>
+                <div className="warm-card p-8">
 
-                        {/* Step Header */}
-                        <div className="mb-6">
-                            <div className="flex items-center gap-3 mb-1">
-                                <div className={`w-8 h-8 rounded-lg ${stepBgColors[currentStep]} flex items-center justify-center`}>
-                                    <span className={`text-sm font-bold ${stepTextColors[currentStep]}`}>{currentStep + 1}</span>
-                                </div>
-                                <h2 className={`text-2xl font-bold text-gradient-animated`}>
-                                    {currentStep === 0 && "Project Metadata"}
-                                    {currentStep === 1 && "Product Definition"}
-                                    {currentStep === 2 && "Target Audience"}
-                                    {currentStep === 3 && "Market Context"}
-                                    {currentStep === 4 && "Creative Goal"}
-                                </h2>
+                    {/* Step Header */}
+                    <div className="mb-6 pb-5 border-b border-[#F0EDEB]">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-[#1E3A5F]/8 flex items-center justify-center">
+                                <span className="text-sm font-bold text-[#1E3A5F]">{currentStep + 1}</span>
                             </div>
-                            <p className="text-sm text-slate-400 ml-11">{STEPS[currentStep].subtitle}</p>
+                            <div>
+                                <h2 className="text-xl font-bold text-[#1C1917]">{stepTitles[currentStep]}</h2>
+                                <p className="text-xs text-[#78716C]">{STEPS[currentStep].subtitle}</p>
+                            </div>
                         </div>
+                    </div>
 
-                        {/* Step 1: Project Metadata */}
+                    <div className="space-y-5">
+
+                        {/* Step 1: Project */}
                         {currentStep === 0 && (
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <Input label="Brand Name" registration={register("project_metadata.brand_name")} error={errors.project_metadata?.brand_name} placeholder="e.g. Acme Corp" />
-                                    <Input label="Website URL" registration={register("project_metadata.website_url")} error={errors.project_metadata?.website_url} placeholder="https://example.com" />
-                                    <Input label="Target Country" registration={register("project_metadata.target_country")} error={errors.project_metadata?.target_country} placeholder="e.g. United States" />
-                                    <Input label="Industry" registration={register("project_metadata.industry")} error={errors.project_metadata?.industry} placeholder="e.g. SaaS, E-commerce" />
-                                </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <WInput label="Brand Name" registration={register("project_metadata.brand_name")} error={errors.project_metadata?.brand_name} placeholder="e.g. Acme Corp" />
+                                <WInput label="Website URL" registration={register("project_metadata.website_url")} error={errors.project_metadata?.website_url} placeholder="https://example.com" />
+                                <WInput label="Target Country" registration={register("project_metadata.target_country")} error={errors.project_metadata?.target_country} placeholder="e.g. United States" />
+                                <WInput label="Industry" registration={register("project_metadata.industry")} error={errors.project_metadata?.industry} placeholder="e.g. SaaS, E-commerce" />
                             </div>
                         )}
 
                         {/* Step 2: Product */}
                         {currentStep === 1 && (
-                            <div className="space-y-4">
-                                <TextArea label="Product Description" registration={register("product_definition.product_description")} error={errors.product_definition?.product_description} placeholder="Describe your product or service in detail..." />
-                                <Input label="Core Problem Solved" registration={register("product_definition.core_problem_solved")} error={errors.product_definition?.core_problem_solved} placeholder="What pain point does it eliminate?" />
-                                <Input label="Unique Selling Proposition" registration={register("product_definition.unique_selling_proposition")} error={errors.product_definition?.unique_selling_proposition} placeholder="What makes you different from competitors?" />
-                            </div>
+                            <>
+                                <WTextArea label="Product Description" registration={register("product_definition.product_description")} error={errors.product_definition?.product_description} placeholder="Describe your product or service in detail..." />
+                                <WInput label="Core Problem Solved" registration={register("product_definition.core_problem_solved")} error={errors.product_definition?.core_problem_solved} placeholder="What pain point does it eliminate?" />
+                                <WInput label="Unique Selling Proposition" registration={register("product_definition.unique_selling_proposition")} error={errors.product_definition?.unique_selling_proposition} placeholder="What makes you different from competitors?" />
+                            </>
                         )}
 
                         {/* Step 3: Audience */}
                         {currentStep === 2 && (
-                            <div className="space-y-4">
+                            <>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <Input label="Demographics" registration={register("target_audience.demographics")} error={errors.target_audience?.demographics} placeholder="Age, gender, income, location..." />
-                                    <Input label="Psychographics" registration={register("target_audience.psychographics")} error={errors.target_audience?.psychographics} placeholder="Values, interests, lifestyle..." />
+                                    <WInput label="Demographics" registration={register("target_audience.demographics")} error={errors.target_audience?.demographics} placeholder="Age, gender, income, location..." />
+                                    <WInput label="Psychographics" registration={register("target_audience.psychographics")} error={errors.target_audience?.psychographics} placeholder="Values, interests, lifestyle..." />
                                 </div>
-                                <Input label="Cultural Nuances (Optional)" registration={register("target_audience.cultural_nuances")} placeholder="Any cultural context to consider?" />
-                            </div>
+                                <WInput label="Cultural Nuances (Optional)" registration={register("target_audience.cultural_nuances")} placeholder="Any cultural context to consider?" />
+                            </>
                         )}
 
-                        {/* Step 4: Market Context */}
+                        {/* Step 4: Market */}
                         {currentStep === 3 && (
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-slate-300">Main Competitors</label>
+                            <>
+                                <div>
+                                    <label className="block text-xs font-semibold text-[#78716C] mb-2 uppercase tracking-wider">Main Competitors</label>
                                     <div className="space-y-2">
                                         {competitors.fields.map((field, index) => (
                                             <div key={field.id} className="flex gap-2">
                                                 <input
                                                     {...register(`market_context.main_competitors.${index}` as const)}
-                                                    className="flex-1 glass border border-slate-600/50 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 outline-none transition-all placeholder-slate-500"
+                                                    className="warm-input flex-1"
                                                     placeholder="Competitor name"
                                                     defaultValue={(field as any).name}
                                                 />
-                                                <button type="button" onClick={() => competitors.remove(index)} className="px-3 text-slate-500 hover:text-red-400 glass border border-slate-700/50 rounded-lg transition-colors">
-                                                    <Trash2 size={16} />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => competitors.remove(index)}
+                                                    className="px-3 border border-[#E7E5E4] rounded-lg text-[#A8A29E] hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"
+                                                >
+                                                    <Trash2 size={14} />
                                                 </button>
                                             </div>
                                         ))}
                                     </div>
-                                    <button type="button" onClick={() => (competitors.append as (v: string) => void)("")} className="text-xs flex items-center gap-1.5 text-blue-400 hover:text-blue-300 py-1 transition-colors">
-                                        <Plus size={14} /> Add Competitor
+                                    <button
+                                        type="button"
+                                        onClick={() => (competitors.append as (v: string) => void)("")}
+                                        className="mt-2 text-xs flex items-center gap-1.5 text-[#1E3A5F] hover:text-[#D97706] transition-colors font-medium"
+                                    >
+                                        <Plus size={13} /> Add Competitor
                                     </button>
                                     {errors.market_context?.main_competitors && (
-                                        <p className="text-xs text-red-400 flex items-center gap-1"><AlertCircle size={12} /> {errors.market_context.main_competitors.message}</p>
+                                        <p className="text-xs text-red-600 flex items-center gap-1 mt-1"><AlertCircle size={11} /> {errors.market_context.main_competitors.message}</p>
                                     )}
                                 </div>
-                                <Input label="Current Marketing Efforts (Optional)" registration={register("market_context.current_marketing_efforts")} placeholder="What are you currently doing to market?" />
-                                <Input label="Known Customer Objections (Optional)" registration={register("market_context.known_customer_objections")} placeholder="Common reasons people don't buy..." />
-                            </div>
+                                <WInput label="Current Marketing Efforts (Optional)" registration={register("market_context.current_marketing_efforts")} placeholder="What are you currently doing to market?" />
+                                <WInput label="Known Customer Objections (Optional)" registration={register("market_context.known_customer_objections")} placeholder="Common reasons people don't buy..." />
+                            </>
                         )}
 
-                        {/* Step 5: Creative Goal */}
+                        {/* Step 5: Goals */}
                         {currentStep === 4 && (
-                            <div className="space-y-4">
-                                <Input label="Primary Objective" registration={register("the_creative_goal.primary_objective")} error={errors.the_creative_goal?.primary_objective} placeholder="e.g. Drive sign-ups, Increase brand awareness" />
-                                <Input label="Desired Tone of Voice" registration={register("the_creative_goal.desired_tone_of_voice")} error={errors.the_creative_goal?.desired_tone_of_voice} placeholder="e.g. Professional, playful, bold..." />
-                                <div className="space-y-2">
-                                    <label className="block text-sm font-medium text-slate-300">Marketing Channels</label>
+                            <>
+                                <WInput label="Primary Objective" registration={register("the_creative_goal.primary_objective")} error={errors.the_creative_goal?.primary_objective} placeholder="e.g. Drive sign-ups, Increase brand awareness" />
+                                <WInput label="Desired Tone of Voice" registration={register("the_creative_goal.desired_tone_of_voice")} error={errors.the_creative_goal?.desired_tone_of_voice} placeholder="e.g. Professional, playful, bold..." />
+                                <div>
+                                    <label className="block text-xs font-semibold text-[#78716C] mb-2 uppercase tracking-wider">Marketing Channels</label>
                                     <div className="space-y-2">
                                         {channels.fields.map((field, index) => (
                                             <div key={field.id} className="flex gap-2">
                                                 <input
                                                     {...register(`the_creative_goal.specific_channels.${index}` as const)}
-                                                    className="flex-1 glass border border-slate-600/50 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 outline-none transition-all placeholder-slate-500"
+                                                    className="warm-input flex-1"
                                                     placeholder="e.g. TikTok, LinkedIn, Email"
                                                     defaultValue={(field as any).name}
                                                 />
-                                                <button type="button" onClick={() => channels.remove(index)} className="px-3 text-slate-500 hover:text-red-400 glass border border-slate-700/50 rounded-lg transition-colors">
-                                                    <Trash2 size={16} />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => channels.remove(index)}
+                                                    className="px-3 border border-[#E7E5E4] rounded-lg text-[#A8A29E] hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"
+                                                >
+                                                    <Trash2 size={14} />
                                                 </button>
                                             </div>
                                         ))}
                                     </div>
-                                    <button type="button" onClick={() => (channels.append as (v: string) => void)("")} className="text-xs flex items-center gap-1.5 text-blue-400 hover:text-blue-300 py-1 transition-colors">
-                                        <Plus size={14} /> Add Channel
+                                    <button
+                                        type="button"
+                                        onClick={() => (channels.append as (v: string) => void)("")}
+                                        className="mt-2 text-xs flex items-center gap-1.5 text-[#1E3A5F] hover:text-[#D97706] transition-colors font-medium"
+                                    >
+                                        <Plus size={13} /> Add Channel
                                     </button>
                                     {errors.the_creative_goal?.specific_channels && (
-                                        <p className="text-xs text-red-400 flex items-center gap-1"><AlertCircle size={12} /> {errors.the_creative_goal.specific_channels.message}</p>
+                                        <p className="text-xs text-red-600 flex items-center gap-1 mt-1"><AlertCircle size={11} /> {errors.the_creative_goal.specific_channels.message}</p>
                                     )}
                                 </div>
-                            </div>
+                            </>
                         )}
 
                         {error && (
-                            <div className="p-4 bg-red-900/30 border border-red-800 text-red-200 rounded-lg flex items-start gap-2">
-                                <AlertCircle size={16} className="flex-shrink-0 mt-0.5" />
-                                <span className="text-sm">{error}</span>
+                            <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-start gap-2 text-sm">
+                                <AlertCircle size={15} className="shrink-0 mt-0.5" />
+                                <span>{error}</span>
                             </div>
                         )}
 
-                        {/* Navigation Buttons */}
-                        <div className="flex items-center justify-between pt-2">
+                        {/* Navigation */}
+                        <div className="flex items-center justify-between pt-2 border-t border-[#F0EDEB]">
                             <button
                                 type="button"
                                 onClick={handleBack}
                                 disabled={currentStep === 0}
-                                className="flex items-center gap-2 px-5 py-2.5 glass rounded-xl border border-slate-700/50 hover:border-slate-500/50 text-slate-300 hover:text-white transition-all disabled:opacity-30 disabled:cursor-not-allowed text-sm font-medium"
+                                className="btn-ghost text-sm disabled:opacity-30 disabled:cursor-not-allowed"
                             >
-                                <ArrowLeft size={16} /> Back
+                                <ArrowLeft size={14} /> Back
                             </button>
 
                             {currentStep < STEPS.length - 1 ? (
                                 <button
                                     type="button"
                                     onClick={handleNext}
-                                    className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-semibold text-sm transition-all group
-                                        bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white glow-blue hover:glow-purple`}
+                                    className="btn-primary text-sm"
                                 >
                                     Next Step
-                                    <ArrowRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+                                    <ArrowRight size={14} />
                                 </button>
                             ) : (
                                 <button
                                     type="submit"
                                     disabled={loading}
-                                    className="flex items-center gap-2 px-8 py-2.5 bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 hover:from-blue-500 hover:via-purple-500 hover:to-cyan-500 text-white font-bold rounded-xl transition-all glow-blue hover:glow-purple disabled:opacity-50 disabled:cursor-not-allowed text-sm group relative overflow-hidden"
+                                    className="btn-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                 >
-                                    <span className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></span>
                                     {loading ? (
-                                        <><Loader2 className="animate-spin relative z-10" size={16} /><span className="relative z-10">Launching...</span></>
+                                        <><Loader2 className="animate-spin" size={14} /> Launching…</>
                                     ) : (
-                                        <><Send size={16} className="relative z-10" /><span className="relative z-10">Launch Analysis</span></>
+                                        <><Send size={14} /> Launch Analysis</>
                                     )}
                                 </button>
                             )}
                         </div>
-
                     </div>
                 </div>
             </form>
@@ -417,29 +413,20 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
     );
 };
 
-// UI Helper Components
-const Input = ({ label, registration, error, placeholder }: any) => (
+// Warm Professional Input Components
+const WInput = ({ label, registration, error, placeholder }: any) => (
     <div className="space-y-1.5">
-        <label className="block text-sm font-medium text-slate-300">{label}</label>
-        <input
-            {...registration}
-            placeholder={placeholder}
-            className="w-full glass border border-slate-600/50 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 outline-none transition-all placeholder-slate-600 hover:border-slate-500/50"
-        />
-        {error && <p className="text-xs text-red-400 flex items-center gap-1"><AlertCircle size={12} /> {error.message}</p>}
+        <label className="block text-xs font-semibold text-[#78716C] uppercase tracking-wider">{label}</label>
+        <input {...registration} placeholder={placeholder} className="warm-input" />
+        {error && <p className="text-xs text-red-600 flex items-center gap-1"><AlertCircle size={11} /> {error.message}</p>}
     </div>
 );
 
-const TextArea = ({ label, registration, error, placeholder }: any) => (
+const WTextArea = ({ label, registration, error, placeholder }: any) => (
     <div className="space-y-1.5">
-        <label className="block text-sm font-medium text-slate-300">{label}</label>
-        <textarea
-            {...registration}
-            rows={4}
-            placeholder={placeholder}
-            className="w-full glass border border-slate-600/50 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50 outline-none transition-all placeholder-slate-600 resize-none hover:border-slate-500/50"
-        />
-        {error && <p className="text-xs text-red-400 flex items-center gap-1"><AlertCircle size={12} /> {error.message}</p>}
+        <label className="block text-xs font-semibold text-[#78716C] uppercase tracking-wider">{label}</label>
+        <textarea {...registration} rows={4} placeholder={placeholder} className="warm-input resize-none" />
+        {error && <p className="text-xs text-red-600 flex items-center gap-1"><AlertCircle size={11} /> {error.message}</p>}
     </div>
 );
 
