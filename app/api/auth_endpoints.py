@@ -11,10 +11,13 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
 from app.db.models import User
-from app.schemas.auth import UserCreate, UserResponse, UserWithToken, GoogleTokenPayload
+from app.schemas.auth import UserCreate, UserResponse, UserWithToken, GoogleTokenPayload, ForgotPasswordRequest, ResetPasswordRequest
 from app.services.auth_service import (
     authenticate_user,
     create_access_token,
+    generate_reset_token,
+    send_reset_email,
+    RESET_TOKEN_EXPIRE_MINUTES,
     get_current_user,
     get_db,
     hash_password,
@@ -154,3 +157,37 @@ def google_login(payload: GoogleTokenPayload, db: Session = Depends(get_db)):
     )
     logger.info(f"Google login: {user.email}")
     return UserWithToken(access_token=token, user=UserResponse.model_validate(user))
+
+
+@router.post("/forgot-password", status_code=status.HTTP_200_OK)
+def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
+    """Request a password reset email. Always returns 200 to avoid email enumeration."""
+    from datetime import datetime, timedelta
+    user = db.query(User).filter(User.email == payload.email).first()
+    if user:
+        token = generate_reset_token()
+        user.reset_token = token
+        user.reset_token_expires = datetime.utcnow() + timedelta(minutes=RESET_TOKEN_EXPIRE_MINUTES)
+        db.commit()
+        try:
+            send_reset_email(user.email, token)
+        except Exception:
+            pass  # logged inside send_reset_email
+    return {"message": "If that email exists, a reset link has been sent."}
+
+
+@router.post("/reset-password", status_code=status.HTTP_200_OK)
+def reset_password(payload: ResetPasswordRequest, db: Session = Depends(get_db)):
+    """Use a reset token to set a new password."""
+    from datetime import datetime
+    if len(payload.new_password) < 6:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Password must be at least 6 characters.")
+    user = db.query(User).filter(User.reset_token == payload.token).first()
+    if not user or not user.reset_token_expires or user.reset_token_expires < datetime.utcnow():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired reset token.")
+    user.hashed_password = hash_password(payload.new_password)
+    user.reset_token = None
+    user.reset_token_expires = None
+    db.commit()
+    logger.info(f"Password reset for {user.email}")
+    return {"message": "Password updated. You can now sign in."}

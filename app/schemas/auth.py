@@ -51,3 +51,12 @@ class AdminUserUpdate(BaseModel):
 
 class GoogleTokenPayload(BaseModel):
     credential: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str

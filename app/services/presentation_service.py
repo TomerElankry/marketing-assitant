@@ -16,6 +16,9 @@ Canvas: 10" × 5.625" widescreen (9,144,000 × 5,143,500 EMU).
 
 import json
 import logging
+import os
+import random
+import traceback
 
 from openai import OpenAI
 
@@ -25,6 +28,69 @@ logger = logging.getLogger(__name__)
 
 SLIDE_W = 9_144_000
 SLIDE_H = 5_143_500
+
+# ---------------------------------------------------------------------------
+# Template definitions
+# Each template file lives in "example pptx/" at the project root.
+# TEMPLATE_MAP: key → (filename, is_dark_background)
+# ---------------------------------------------------------------------------
+_EXAMPLES_DIR_RELATIVE = os.path.join(os.path.dirname(__file__), "..", "..", "example pptx")
+_EXAMPLES_DIR_CWD = os.path.join(os.getcwd(), "example pptx")
+_EXAMPLES_DIR = (
+    _EXAMPLES_DIR_RELATIVE
+    if os.path.isdir(_EXAMPLES_DIR_RELATIVE)
+    else _EXAMPLES_DIR_CWD
+)
+
+TEMPLATE_MAP = {
+    "corporate": (
+        "Black and Red Elegant Corporate Marketing Plan Presentation.pptx",
+        True,        # dark background
+        "diagonal",  # matching design_variant
+    ),
+    "digital": (
+        "Cream Blue Creative Modern Digital Marketing Presentation (1).pptx",
+        False,
+        "bold_contrast",
+    ),
+    "organic": (
+        "Green And White Illustrative Marketing Plan Presentation.pptx",
+        False,
+        "top_band",
+    ),
+    "creative": (
+        "Orange and Cream Illustration Marketing Plan Presentation.pptx",
+        False,
+        "minimal",
+    ),
+}
+
+# Industry keyword → template key
+_TEMPLATE_INDUSTRY: dict[str, str] = {
+    "finance": "corporate", "fintech": "corporate", "banking": "corporate",
+    "b2b": "corporate", "consulting": "corporate", "insurance": "corporate",
+    "legal": "corporate",
+    "tech": "digital", "saas": "digital", "software": "digital",
+    "startup": "digital", "ai": "digital", "media": "digital", "gaming": "digital",
+    "wellness": "organic", "health": "organic", "food": "organic",
+    "sustainability": "organic", "ecommerce": "organic", "retail": "organic",
+    "fitness": "organic", "restaurant": "organic",
+    "fashion": "creative", "beauty": "creative", "luxury": "creative",
+    "travel": "creative", "education": "creative", "real estate": "creative",
+    "lifestyle": "creative",
+}
+
+# Tone keyword → template key (applied after industry, so tone can override)
+_TEMPLATE_TONE: dict[str, str] = {
+    "corporate": "corporate", "professional": "corporate", "trustworthy": "corporate",
+    "elegant": "corporate", "sophisticated": "corporate",
+    "innovative": "digital", "modern": "digital", "bold": "digital",
+    "edgy": "digital", "dynamic": "digital",
+    "clean": "organic", "minimal": "organic", "organic": "organic",
+    "fresh": "organic", "sustainable": "organic",
+    "playful": "creative", "fun": "creative", "energetic": "creative",
+    "youthful": "creative", "vibrant": "creative", "creative": "creative",
+}
 
 from pptx.enum.shapes import MSO_AUTO_SHAPE_TYPE
 
@@ -273,7 +339,21 @@ RULES:
 
         try:
             theme = self._derive_theme(questionnaire or {})
-            prs = Presentation()
+
+            template_path = theme.get("template_path")
+            if template_path and os.path.isfile(template_path):
+                prs = Presentation(template_path)
+                logger.info(f"Using template: {os.path.basename(template_path)}")
+                # Remove the template's existing content slides (keep slide master/layouts)
+                _NS_R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+                xml_slide_list = prs.slides._sldIdLst
+                for sld_id_el in list(xml_slide_list):
+                    rId = sld_id_el.get(_NS_R + "id")
+                    if rId:
+                        prs.part.drop_rel(rId)
+                    xml_slide_list.remove(sld_id_el)
+            else:
+                prs = Presentation()
             prs.slide_width = Emu(SLIDE_W)
             prs.slide_height = Emu(SLIDE_H)
 
@@ -323,8 +403,8 @@ RULES:
             return output_path
 
         except Exception as e:
-            logger.error(f"PPTX generation error: {e}")
-            return None
+            logger.exception("PPTX generation error")
+            raise RuntimeError(f"PPTX generation failed: {e}") from e
 
     # =========================================================================
     # PRIVATE: _derive_theme
@@ -391,7 +471,7 @@ RULES:
             bg_hex = "0f172a"
             is_light_bg = False
         if force_light and not is_light_bg:
-            bg_hex = "f8fafc"
+            bg_hex = "eee9e2"
             is_light_bg = True
         if force_gold:
             accent_hex = "f59e0b"
@@ -412,68 +492,153 @@ RULES:
             card_b = min(255, (bg_int & 0xFF) + 30)
             card_bg_hex = f"{card_r:02x}{card_g:02x}{card_b:02x}"
         else:
-            card_bg_hex = "e2e8f0"
+            card_bg_hex = "dbd5cd"
 
         def h(hex_str: str):
             s = hex_str.lstrip("#")
             return RGBColor(int(s[0:2], 16), int(s[2:4], 16), int(s[4:6], 16))
 
+        # ── Template + design_variant: selected deterministically from input ──
+        # Industry keyword takes priority; tone can override.
+        template_key = "digital"  # default
+        for kw, tkey in _TEMPLATE_INDUSTRY.items():
+            if kw in industry_raw:
+                template_key = tkey
+                break
+        for kw in tone_tokens:
+            if kw in _TEMPLATE_TONE:
+                template_key = _TEMPLATE_TONE[kw]
+                break
+
+        template_fname, template_is_dark, design_variant = TEMPLATE_MAP[template_key]
+        template_path = os.path.join(_EXAMPLES_DIR, template_fname)
+        use_template = os.path.isfile(template_path)
+
+        # If using a template, override dark_theme to match the template's bg
+        if use_template:
+            is_light_bg = not template_is_dark
+            text_main = text_dark if is_light_bg else text_light
+            muted = "94a3b8" if not is_light_bg else "64748b"
+
         return {
-            "primary":        h(primary_hex),
-            "secondary":      h(secondary_hex),
-            "accent":         h(accent_hex),
-            "bg":             h(bg_hex),
-            "card_bg":        h(card_bg_hex),
-            "text_main":      h(text_main),
-            "text_light":     h(text_light),
-            "text_dark":      h(text_dark),
-            "muted":          h(muted),
-            "dark_theme":     not is_light_bg,
-            "brand_name":     brand_name,
-            "website_url":    website_url,
-            "target_country": country,
-            "channels":       channels,
+            "primary":          h(primary_hex),
+            "secondary":        h(secondary_hex),
+            "accent":           h(accent_hex),
+            "bg":               h(bg_hex),
+            "card_bg":          h(card_bg_hex),
+            "text_main":        h(text_main),
+            "text_light":       h(text_light),
+            "text_dark":        h(text_dark),
+            "muted":            h(muted),
+            "dark_theme":       not is_light_bg,
+            "design_variant":   design_variant,
+            "brand_name":       brand_name,
+            "website_url":      website_url,
+            "target_country":   country,
+            "channels":         channels,
+            "template_path":    template_path if use_template else None,
+            "use_template_bg":  use_template,
         }
 
     # =========================================================================
     # PRIVATE: low-level drawing utilities
     # =========================================================================
 
-    def _set_background(self, slide, color) -> None:
+    def _set_background(self, slide, color, theme=None) -> None:
+        if theme and theme.get("use_template_bg"):
+            return  # let template master background show through
         fill = slide.background.fill
         fill.solid()
         fill.fore_color.rgb = color
 
     def _add_bg_accent(self, slide, theme) -> None:
         """
-        Adds a subtle geometric depth panel to the bottom-right of a content slide.
-        For dark themes: slightly lighter rectangle. For light themes: slightly darker.
+        Geometric depth element — shape varies by design_variant:
+          diagonal / bold_contrast → diagonal freeform triangle (bottom-right)
+          top_band                 → bottom-left triangle
+          minimal                  → very subtle rect strip
         """
+        if theme.get("use_template_bg"):
+            return  # template has its own decorative background elements
         from pptx.dml.color import RGBColor
         bg = theme["bg"]
-        r, g, b = bg.rgb >> 16, (bg.rgb >> 8) & 0xFF, bg.rgb & 0xFF
+        r, g, b = bg[0], bg[1], bg[2]
         if theme["dark_theme"]:
-            nr = min(255, r + 22)
-            ng = min(255, g + 22)
-            nb = min(255, b + 32)
+            nr = min(255, r + 20); ng = min(255, g + 20); nb = min(255, b + 28)
         else:
-            nr = max(0, r - 14)
-            ng = max(0, g - 14)
-            nb = max(0, b - 14)
+            nr = max(0, r - 10);   ng = max(0, g - 10);   nb = max(0, b - 10)
         depth_color = RGBColor(nr, ng, nb)
-        w = int(SLIDE_W * 0.42)
-        h = int(SLIDE_H * 0.55)
-        self._add_rect(slide, SLIDE_W - w, SLIDE_H - h, w, h, depth_color)
+        variant = theme.get("design_variant", "diagonal")
+
+        try:
+            if variant == "top_band":
+                # Bottom-left triangle
+                builder = slide.shapes.build_freeform(0, SLIDE_H)
+                builder.add_line_to(int(SLIDE_W * 0.48), SLIDE_H)
+                builder.add_line_to(0, int(SLIDE_H * 0.62))
+                tri = builder.convert_to_shape()
+            elif variant == "minimal":
+                # Thin right-edge strip instead
+                self._add_rect(slide, SLIDE_W - int(SLIDE_W * 0.018), 0,
+                                int(SLIDE_W * 0.018), SLIDE_H, depth_color)
+                return
+            else:
+                # diagonal / bold_contrast: bottom-right triangle
+                builder = slide.shapes.build_freeform(SLIDE_W, SLIDE_H)
+                builder.add_line_to(SLIDE_W, int(SLIDE_H * 0.28))
+                builder.add_line_to(int(SLIDE_W * 0.50), SLIDE_H)
+                tri = builder.convert_to_shape()
+            tri.fill.solid()
+            tri.fill.fore_color.rgb = depth_color
+            tri.line.fill.background()
+        except Exception:
+            w = int(SLIDE_W * 0.42)
+            h = int(SLIDE_H * 0.55)
+            self._add_rect(slide, SLIDE_W - w, SLIDE_H - h, w, h, depth_color)
 
     def _add_slide_counter(self, slide, num: int, total: int, theme: dict) -> None:
-        """Adds a small slide counter badge (e.g. '03 / 16') in the bottom-right corner."""
-        badge_w = int(SLIDE_W * 0.095)
-        badge_h = int(SLIDE_H * 0.052)
-        badge_l = SLIDE_W - badge_w - int(SLIDE_W * 0.018)
-        badge_t = SLIDE_H - badge_h - int(SLIDE_H * 0.022)
-        self._add_rounded_rect(slide, badge_l, badge_t, badge_w, badge_h, theme["card_bg"], corner=0.3)
+        """Full-width footer bar: brand name (left), website (center), slide counter (right)."""
+        from pptx.dml.color import RGBColor
+        footer_h = int(SLIDE_H * 0.060)
+        footer_t = SLIDE_H - footer_h
+
+        bg = theme["bg"]
+        if theme["dark_theme"]:
+            nr = min(255, bg[0] + 16)
+            ng = min(255, bg[1] + 16)
+            nb = min(255, bg[2] + 22)
+        else:
+            nr = max(0, bg[0] - 13)
+            ng = max(0, bg[1] - 13)
+            nb = max(0, bg[2] - 13)
+        footer_color = RGBColor(nr, ng, nb)
+
+        self._add_rect(slide, 0, footer_t, SLIDE_W, footer_h, footer_color)
+        # Thin accent rule above footer
+        self._add_rect(slide, 0, footer_t, SLIDE_W, int(SLIDE_H * 0.0025), theme["primary"])
+
+        margin = int(SLIDE_W * 0.055)
+        mid_t  = footer_t + int(footer_h * 0.22)
+
+        # Brand name — left
+        if theme["brand_name"]:
+            self._add_textbox(
+                slide, margin, mid_t,
+                int(SLIDE_W * 0.38), int(footer_h * 0.60),
+                theme["brand_name"].upper(), 9, theme["muted"], bold=True,
+            )
+        # Website URL — centre
+        if theme.get("website_url"):
+            self._add_textbox(
+                slide, int(SLIDE_W * 0.38), mid_t,
+                int(SLIDE_W * 0.30), int(footer_h * 0.60),
+                theme["website_url"], 8, theme["muted"],
+            )
+        # Slide counter — right
         self._add_textbox(
-            slide, badge_l, badge_t, badge_w, badge_h,
+            slide,
+            SLIDE_W - margin - int(SLIDE_W * 0.12), mid_t,
+            int(SLIDE_W * 0.12), int(footer_h * 0.60),
             f"{num:02d} / {total:02d}", 9, theme["muted"], bold=True,
         )
 
@@ -532,48 +697,52 @@ RULES:
 
     def _add_slide_header(self, slide, title: str, theme: dict, section_label: str = "") -> None:
         """
-        Consistent slide header for all content slides:
-          - Full-width primary stripe at top (thin)
-          - Slide title (left, 26pt bold, text_main)
-          - Section label pill (next to title, colored)
-          - Brand name (right, 12pt bold, muted)
-          - Full-width rule below header area
+        Modern editorial slide header:
+          - Full-height left accent strip (primary color) + thin secondary strip
+          - Slide title (left, 28pt bold, text_main)
+          - Section label displayed as large muted text on the right of header
+          - Brand name (top-right, 11pt muted)
+          - Full-width muted rule below header zone
+        Design style varies per theme["design_variant"].
         """
-        stripe_h = int(SLIDE_H * 0.011)
-        self._add_rect(slide, 0, 0, SLIDE_W, stripe_h, theme["primary"])
+        variant = theme.get("design_variant", "diagonal")
+        margin  = int(SLIDE_W * 0.055)
 
-        margin = int(SLIDE_W * 0.05)
-        header_top = int(SLIDE_H * 0.035)
+        if variant in ("diagonal", "bold_contrast"):
+            # Full-height left accent strips
+            strip_w = int(SLIDE_W * 0.018)
+            self._add_rect(slide, 0, 0, strip_w, SLIDE_H, theme["primary"])
+            self._add_rect(slide, strip_w, 0, int(strip_w * 0.40), SLIDE_H, theme["secondary"])
+        elif variant == "top_band":
+            # Top band instead of left strip
+            band_h = int(SLIDE_H * 0.014)
+            self._add_rect(slide, 0, 0, SLIDE_W, band_h, theme["primary"])
+            self._add_rect(slide, 0, band_h, SLIDE_W, int(band_h * 0.45), theme["accent"])
+        elif variant == "minimal":
+            # Very thin left strip only
+            self._add_rect(slide, 0, 0, int(SLIDE_W * 0.008), SLIDE_H, theme["accent"])
 
-        # Title
+        header_top = int(SLIDE_H * 0.038)
+
+        # Slide title
         self._add_textbox(
             slide,
             left=margin, top=header_top,
-            width=int(SLIDE_W * 0.58), height=int(SLIDE_H * 0.14),
+            width=int(SLIDE_W * 0.60), height=int(SLIDE_H * 0.14),
             text=title,
-            font_size=26, font_color=theme["text_main"], bold=True,
+            font_size=28, font_color=theme["text_main"], bold=True,
         )
-        # Section label pill (positioned to the right of title area)
-        if section_label:
-            pill_w = int(SLIDE_W * 0.115)
-            pill_h = int(SLIDE_H * 0.052)
-            pill_l = int(SLIDE_W * 0.645)
-            pill_t = header_top + int(SLIDE_H * 0.042)
-            self._add_rounded_rect(slide, pill_l, pill_t, pill_w, pill_h, theme["accent"], corner=0.3)
-            self._add_textbox(
-                slide, pill_l + int(SLIDE_W * 0.006), pill_t + int(SLIDE_H * 0.008),
-                pill_w - int(SLIDE_W * 0.008), pill_h,
-                section_label, 8, theme["text_light"], bold=True,
-            )
-        # Brand name (top-right)
+
+        # Brand name (top-right corner)
         self._add_textbox(
             slide,
-            left=int(SLIDE_W * 0.79), top=header_top,
-            width=int(SLIDE_W * 0.16), height=int(SLIDE_H * 0.10),
+            left=int(SLIDE_W * 0.82), top=header_top,
+            width=int(SLIDE_W * 0.14), height=int(SLIDE_H * 0.10),
             text=theme["brand_name"].upper(),
-            font_size=11, font_color=theme["muted"], bold=True,
+            font_size=10, font_color=theme["muted"], bold=True,
         )
-        # Rule below header
+
+        # Full-width rule below header
         self._add_rect(
             slide,
             left=0, top=int(SLIDE_H * 0.185),
@@ -588,15 +757,16 @@ RULES:
     ) -> None:
         """
         Draw a card with:
-          - Rounded dark background
-          - Colored left border stripe (default) or top border
-          - LABEL text (small, muted)
-          - HEADER text (bold, text_main)
+          - Rounded background
+          - Colored left border stripe (default) or top border (thicker than before)
+          - LABEL text (small, accent-colored)
+          - HEADER text (bold, text_main, larger)
           - BODY lines (regular, muted, bulleted)
         """
         body_lines = body_lines or []
         accent = accent_color or theme["primary"]
-        border_thickness = int(SLIDE_W * 0.005) if not top_border else int(SLIDE_H * 0.008)
+        # Thicker borders for a more premium look
+        border_thickness = int(SLIDE_W * 0.006) if not top_border else int(SLIDE_H * 0.013)
 
         # Card background
         self._add_rounded_rect(slide, left, top, width, height, theme["card_bg"])
@@ -620,7 +790,7 @@ RULES:
             lh = int(SLIDE_H * 0.065)
             self._add_textbox(
                 slide, content_left, y, content_w, lh,
-                label.upper(), 8, theme["muted"], bold=True,
+                label.upper(), 9, accent, bold=True,
             )
             y += lh
 
@@ -629,7 +799,7 @@ RULES:
             hh = int(SLIDE_H * 0.11)
             self._add_textbox(
                 slide, content_left, y, content_w, hh,
-                header, 14, theme["text_main"], bold=True,
+                header, 16, theme["text_main"], bold=True,
             )
             y += hh
 
@@ -639,7 +809,7 @@ RULES:
             body_text = "\n".join(f"• {ln}" for ln in body_lines) if len(body_lines) > 1 else (body_lines[0] if body_lines else "")
             self._add_textbox(
                 slide, content_left, y, content_w, remaining,
-                body_text, 11, theme["muted"],
+                body_text, 12, theme["muted"],
             )
 
     # =========================================================================
@@ -647,65 +817,143 @@ RULES:
     # =========================================================================
 
     def _build_slide_title(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
-        """Title slide: left accent sidebar + freeform geometric triangle (top-right) + brand name + campaign title + subtitle."""
+        """
+        Title slide with visual style driven by theme["design_variant"]:
+          - "diagonal"      : Large diagonal freeform split (left panel / right content)
+          - "bold_contrast" : Full-bleed left panel + top-right corner triangle
+          - "top_band"      : Wide top band + centered content
+          - "minimal"       : Clean split with geometric accent + oversized typography
+        """
         from pptx.util import Emu
-        self._set_background(slide, theme["bg"])
+        from pptx.dml.color import RGBColor
 
-        sidebar_w = int(SLIDE_W * 0.20)
-        stripe_w  = int(sidebar_w * 0.12)
-        self._add_rect(slide, 0, 0, sidebar_w, SLIDE_H, theme["accent"])
-        self._add_rect(slide, sidebar_w - stripe_w, 0, stripe_w, SLIDE_H, theme["primary"])
+        self._set_background(slide, theme["bg"], theme)
+        variant = theme.get("design_variant", "diagonal")
 
-        # Freeform geometric triangle accent — top-right corner
-        try:
-            builder = slide.shapes.build_freeform(SLIDE_W, 0)
-            builder.add_line_to(SLIDE_W, int(SLIDE_H * 0.62))
-            builder.add_line_to(int(SLIDE_W * 0.58), 0)
-            tri = builder.convert_to_shape()
-            tri.fill.solid()
-            tri.fill.fore_color.rgb = theme["primary"]
-            tri.line.fill.background()
-        except Exception:
-            pass
 
-        # Smaller secondary triangle overlay (accent color, more opaque feel)
-        try:
-            builder2 = slide.shapes.build_freeform(SLIDE_W, 0)
-            builder2.add_line_to(SLIDE_W, int(SLIDE_H * 0.38))
-            builder2.add_line_to(int(SLIDE_W * 0.75), 0)
-            tri2 = builder2.convert_to_shape()
-            tri2.fill.solid()
-            tri2.fill.fore_color.rgb = theme["accent"]
-            tri2.line.fill.background()
-        except Exception:
-            pass
+        # ── VARIANT: diagonal ─────────────────────────────────────────────────
+        if variant == "diagonal":
+            # Large diagonal left panel (primary)
+            try:
+                b = slide.shapes.build_freeform(0, 0)
+                b.add_line_to(int(SLIDE_W * 0.50), 0)
+                b.add_line_to(int(SLIDE_W * 0.38), SLIDE_H)
+                b.add_line_to(0, SLIDE_H)
+                p = b.convert_to_shape(); p.fill.solid(); p.fill.fore_color.rgb = theme["primary"]; p.line.fill.background()
+            except Exception:
+                self._add_rect(slide, 0, 0, int(SLIDE_W * 0.42), SLIDE_H, theme["primary"])
+            # Narrower accent overlay
+            try:
+                b2 = slide.shapes.build_freeform(0, 0)
+                b2.add_line_to(int(SLIDE_W * 0.30), 0)
+                b2.add_line_to(int(SLIDE_W * 0.22), SLIDE_H)
+                b2.add_line_to(0, SLIDE_H)
+                p2 = b2.convert_to_shape(); p2.fill.solid(); p2.fill.fore_color.rgb = theme["accent"]; p2.line.fill.background()
+            except Exception:
+                pass
+            # Small top-right triangle (secondary)
+            try:
+                b3 = slide.shapes.build_freeform(SLIDE_W, 0)
+                b3.add_line_to(SLIDE_W, int(SLIDE_H * 0.45))
+                b3.add_line_to(int(SLIDE_W * 0.65), 0)
+                p3 = b3.convert_to_shape(); p3.fill.solid(); p3.fill.fore_color.rgb = theme["secondary"]; p3.line.fill.background()
+            except Exception:
+                pass
+            content_left = int(SLIDE_W * 0.43)
+            content_w    = int(SLIDE_W * 0.50)
 
-        content_left = int(SLIDE_W * 0.23)
-        content_w    = int(SLIDE_W * 0.50)
+        # ── VARIANT: bold_contrast ─────────────────────────────────────────────
+        elif variant == "bold_contrast":
+            sidebar_w = int(SLIDE_W * 0.22)
+            self._add_rect(slide, 0, 0, sidebar_w, SLIDE_H, theme["primary"])
+            self._add_rect(slide, sidebar_w, 0, int(sidebar_w * 0.10), SLIDE_H, theme["accent"])
+            # Large top-right triangle
+            try:
+                b = slide.shapes.build_freeform(SLIDE_W, 0)
+                b.add_line_to(SLIDE_W, int(SLIDE_H * 0.65))
+                b.add_line_to(int(SLIDE_W * 0.55), 0)
+                p = b.convert_to_shape(); p.fill.solid(); p.fill.fore_color.rgb = theme["secondary"]; p.line.fill.background()
+            except Exception:
+                pass
+            try:
+                b2 = slide.shapes.build_freeform(SLIDE_W, 0)
+                b2.add_line_to(SLIDE_W, int(SLIDE_H * 0.40))
+                b2.add_line_to(int(SLIDE_W * 0.72), 0)
+                p2 = b2.convert_to_shape(); p2.fill.solid(); p2.fill.fore_color.rgb = theme["accent"]; p2.line.fill.background()
+            except Exception:
+                pass
+            content_left = int(SLIDE_W * 0.26)
+            content_w    = int(SLIDE_W * 0.46)
 
+        # ── VARIANT: top_band ─────────────────────────────────────────────────
+        elif variant == "top_band":
+            # Bold horizontal band across top ~40%
+            self._add_rect(slide, 0, 0, SLIDE_W, int(SLIDE_H * 0.42), theme["primary"])
+            # Accent strip at band bottom
+            self._add_rect(slide, 0, int(SLIDE_H * 0.40), SLIDE_W, int(SLIDE_H * 0.025), theme["accent"])
+            # Bottom-right corner freeform
+            try:
+                b = slide.shapes.build_freeform(SLIDE_W, SLIDE_H)
+                b.add_line_to(int(SLIDE_W * 0.30), SLIDE_H)
+                b.add_line_to(SLIDE_W, int(SLIDE_H * 0.55))
+                p = b.convert_to_shape(); p.fill.solid(); p.fill.fore_color.rgb = theme["secondary"]; p.line.fill.background()
+            except Exception:
+                pass
+            content_left = int(SLIDE_W * 0.06)
+            content_w    = int(SLIDE_W * 0.58)
+
+        # ── VARIANT: minimal ──────────────────────────────────────────────────
+        else:  # "minimal"
+            # Thin left strip
+            self._add_rect(slide, 0, 0, int(SLIDE_W * 0.012), SLIDE_H, theme["accent"])
+            # Large diagonal background element (muted, large, decorative)
+            try:
+                bg = theme["bg"]
+                if theme["dark_theme"]:
+                    dec_c = RGBColor(min(255,bg[0]+18), min(255,bg[1]+18), min(255,bg[2]+25))
+                else:
+                    dec_c = RGBColor(max(0,bg[0]-8), max(0,bg[1]-8), max(0,bg[2]-8))
+                b = slide.shapes.build_freeform(SLIDE_W, 0)
+                b.add_line_to(SLIDE_W, SLIDE_H)
+                b.add_line_to(int(SLIDE_W * 0.38), SLIDE_H)
+                p = b.convert_to_shape(); p.fill.solid(); p.fill.fore_color.rgb = dec_c; p.line.fill.background()
+            except Exception:
+                pass
+            # Accent horizontal line across middle
+            self._add_rect(slide, int(SLIDE_W * 0.06), int(SLIDE_H * 0.50),
+                           int(SLIDE_W * 0.52), int(SLIDE_H * 0.006), theme["primary"])
+            content_left = int(SLIDE_W * 0.06)
+            content_w    = int(SLIDE_W * 0.58)
+
+        # ── SHARED CONTENT ────────────────────────────────────────────────────
+        # Brand name label
+        brand_top = int(SLIDE_H * 0.09) if variant == "top_band" else int(SLIDE_H * 0.10)
+        brand_color = theme["text_light"] if variant == "top_band" else theme["accent"]
         self._add_textbox(
-            slide, content_left, int(SLIDE_H * 0.08), content_w, int(SLIDE_H * 0.12),
-            theme["brand_name"].upper(), 14, theme["accent"], bold=True,
+            slide, content_left, brand_top, content_w, int(SLIDE_H * 0.10),
+            theme["brand_name"].upper(), 14, brand_color, bold=True,
         )
-        self._add_rect(
-            slide, content_left, int(SLIDE_H * 0.21),
-            int(SLIDE_W * 0.50), int(SLIDE_H * 0.008), theme["primary"],
-        )
+        # Accent divider line
+        line_top = int(SLIDE_H * 0.225) if variant != "top_band" else int(SLIDE_H * 0.47)
+        self._add_rect(slide, content_left, line_top, int(SLIDE_W * 0.44), int(SLIDE_H * 0.006), theme["accent"])
+
+        # Campaign title
+        title_top = int(SLIDE_H * 0.26) if variant != "top_band" else int(SLIDE_H * 0.51)
+        title_color = theme["text_main"] if variant != "top_band" else theme["text_dark"]
         self._add_textbox(
-            slide, content_left, int(SLIDE_H * 0.28), content_w, int(SLIDE_H * 0.32),
-            slide_info.get("title", ""), 36, theme["text_main"], bold=True,
+            slide, content_left, title_top, content_w, int(SLIDE_H * 0.36),
+            slide_info.get("title", ""), 38, title_color, bold=True,
         )
+
+        # Subtitle
         subtitle = slide_info.get("subtitle", "")
         if subtitle:
+            sub_top = int(SLIDE_H * 0.64) if variant != "top_band" else int(SLIDE_H * 0.70)
             self._add_textbox(
-                slide, content_left, int(SLIDE_H * 0.62), content_w, int(SLIDE_H * 0.20),
-                subtitle, 20, theme["muted"],
+                slide, content_left, sub_top, content_w, int(SLIDE_H * 0.18),
+                subtitle, 17, theme["muted"],
             )
-        if theme["website_url"]:
-            self._add_textbox(
-                slide, content_left, int(SLIDE_H * 0.87), content_w, int(SLIDE_H * 0.08),
-                theme["website_url"], 10, theme["muted"],
-            )
+
         self._add_slide_counter(slide, slide_num, total_slides, theme)
 
     def _build_slide_company_intro(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
@@ -713,7 +961,7 @@ RULES:
         Company intro: left 43% = headline + description with left bar,
                        right 52% = 3 stacked KVP cards.
         """
-        self._set_background(slide, theme["bg"])
+        self._set_background(slide, theme["bg"], theme)
         self._add_bg_accent(slide, theme)
         self._add_slide_header(slide, slide_info.get("title", "About The Company"), theme, "OVERVIEW")
         self._add_slide_counter(slide, slide_num, total_slides, theme)
@@ -772,7 +1020,7 @@ RULES:
 
     def _build_slide_two_by_two(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """2×2 grid of labeled cards."""
-        self._set_background(slide, theme["bg"])
+        self._set_background(slide, theme["bg"], theme)
         self._add_bg_accent(slide, theme)
         self._add_slide_header(slide, slide_info.get("title", ""), theme, "MARKET")
         self._add_slide_counter(slide, slide_num, total_slides, theme)
@@ -805,7 +1053,7 @@ RULES:
 
     def _build_slide_single_card(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """Single large centered card for a focused challenge or key message."""
-        self._set_background(slide, theme["bg"])
+        self._set_background(slide, theme["bg"], theme)
         self._add_bg_accent(slide, theme)
         self._add_slide_header(slide, slide_info.get("title", ""), theme, "CHALLENGE")
 
@@ -816,22 +1064,6 @@ RULES:
 
         # Card background
         self._add_rounded_rect(slide, margin, c_top, c_w, c_h, theme["card_bg"])
-
-        # Large decorative brand initial watermark (bottom-right of card)
-        initial = theme["brand_name"][:1].upper() if theme["brand_name"] else ""
-        if initial:
-            from pptx.dml.color import RGBColor
-            card_bg = theme["card_bg"]
-            r = min(255, (card_bg.rgb >> 16) + 28)
-            g = min(255, ((card_bg.rgb >> 8) & 0xFF) + 28)
-            b = min(255, (card_bg.rgb & 0xFF) + 35)
-            watermark_color = RGBColor(r, g, b)
-            self._add_textbox(
-                slide,
-                left=margin + int(c_w * 0.62), top=c_top + int(c_h * 0.22),
-                width=int(c_w * 0.36), height=int(c_h * 0.72),
-                text=initial, font_size=180, font_color=watermark_color, bold=True,
-            )
 
         # Left accent border
         border_w = int(SLIDE_W * 0.007)
@@ -886,7 +1118,7 @@ RULES:
 
     def _build_slide_three_col(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """3-column card layout (audience, barriers, etc.)."""
-        self._set_background(slide, theme["bg"])
+        self._set_background(slide, theme["bg"], theme)
         self._add_bg_accent(slide, theme)
         self._add_slide_header(slide, slide_info.get("title", ""), theme, "STRATEGY")
         self._add_slide_counter(slide, slide_num, total_slides, theme)
@@ -999,7 +1231,7 @@ RULES:
         """
         from pptx.util import Emu
 
-        self._set_background(slide, theme["bg"])
+        self._set_background(slide, theme["bg"], theme)
         self._add_bg_accent(slide, theme)
         self._add_slide_header(slide, slide_info.get("title", "Target Audience"), theme, "AUDIENCE")
         self._add_slide_counter(slide, slide_num, total_slides, theme)
@@ -1175,7 +1407,7 @@ RULES:
         import concurrent.futures
         from pptx.util import Emu
 
-        self._set_background(slide, theme["bg"])
+        self._set_background(slide, theme["bg"], theme)
         self._add_bg_accent(slide, theme)
         self._add_slide_header(slide, slide_info.get("title", "Target Personas"), theme, "AUDIENCE")
         self._add_slide_counter(slide, slide_num, total_slides, theme)
@@ -1260,7 +1492,7 @@ RULES:
 
     def _build_slide_two_col(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """Two-column card comparison."""
-        self._set_background(slide, theme["bg"])
+        self._set_background(slide, theme["bg"], theme)
         self._add_bg_accent(slide, theme)
         self._add_slide_header(slide, slide_info.get("title", ""), theme, "COMPETITIVE")
         self._add_slide_counter(slide, slide_num, total_slides, theme)
@@ -1291,7 +1523,7 @@ RULES:
 
     def _build_slide_content(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """Standard content slide with consistent header + bullet cards."""
-        self._set_background(slide, theme["bg"])
+        self._set_background(slide, theme["bg"], theme)
         self._add_bg_accent(slide, theme)
         self._add_slide_header(slide, slide_info.get("title", ""), theme)
         self._add_slide_counter(slide, slide_num, total_slides, theme)
@@ -1332,7 +1564,7 @@ RULES:
 
     def _build_slide_campaign(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """Campaign concept slide with technique badge + numbered tactic markers + step connector."""
-        self._set_background(slide, theme["bg"])
+        self._set_background(slide, theme["bg"], theme)
         self._add_bg_accent(slide, theme)
         self._add_slide_header(slide, slide_info.get("title", ""), theme, "CAMPAIGN")
 
@@ -1416,7 +1648,7 @@ RULES:
         Two real company campaign examples side by side.
         Each card: company + technique badge + strategy name + 3 checkmark items.
         """
-        self._set_background(slide, theme["bg"])
+        self._set_background(slide, theme["bg"], theme)
         self._add_bg_accent(slide, theme)
         self._add_slide_header(slide, slide_info.get("title", "Campaign Inspiration"), theme, "CAMPAIGN")
         self._add_slide_counter(slide, slide_num, total_slides, theme)
@@ -1500,7 +1732,7 @@ RULES:
 
     def _build_slide_hooks(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """Marketing Hooks slide: alternating colored callout boxes + oversized quote decoration."""
-        self._set_background(slide, theme["bg"])
+        self._set_background(slide, theme["bg"], theme)
         self._add_bg_accent(slide, theme)
         self._add_slide_header(slide, slide_info.get("title", "Marketing Hooks"), theme, "HOOKS")
 
@@ -1556,7 +1788,7 @@ RULES:
         KPI / Evaluation slide: 3 columns, each with big numbers + labels + progress bars.
         Layout mirrors reference deck Awareness / Engagement / Conversion.
         """
-        self._set_background(slide, theme["bg"])
+        self._set_background(slide, theme["bg"], theme)
         self._add_bg_accent(slide, theme)
         self._add_slide_header(slide, slide_info.get("title", "KPI's"), theme, "KPI'S")
 
@@ -1644,7 +1876,7 @@ RULES:
 
     def _build_slide_roadmap(self, slide, slide_info: dict, theme: dict, slide_num: int = 1, total_slides: int = 1) -> None:
         """Execution roadmap — 3-phase grid + channel pills."""
-        self._set_background(slide, theme["bg"])
+        self._set_background(slide, theme["bg"], theme)
         self._add_bg_accent(slide, theme)
         self._add_slide_header(slide, slide_info.get("title", "Execution Roadmap"), theme, "ROADMAP")
         self._add_slide_counter(slide, slide_num, total_slides, theme)

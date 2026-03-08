@@ -10,6 +10,8 @@ interface AuthContextType {
     register: (email: string, password: string, fullName?: string) => Promise<void>;
     loginWithGoogle: (credential: string) => Promise<void>;
     logout: () => void;
+    forgotPassword: (email: string) => Promise<void>;
+    resetPassword: (token: string, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -88,8 +90,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setUser(null);
     };
 
+    const forgotPassword = async (email: string) => {
+        await api.post('/auth/forgot-password', { email });
+    };
+
+    const resetPassword = async (token: string, newPassword: string) => {
+        await api.post('/auth/reset-password', { token, new_password: newPassword });
+    };
+
     return (
-        <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, register, loginWithGoogle, logout }}>
+        <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, register, loginWithGoogle, logout, forgotPassword, resetPassword }}>
             {children}
         </AuthContext.Provider>
     );

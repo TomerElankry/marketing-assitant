@@ -2,7 +2,10 @@
 Authentication service — JWT creation/validation + password hashing.
 """
 import logging
+import secrets
+import smtplib
 from datetime import datetime, timedelta
+from email.mime.text import MIMEText
 from typing import Optional
 
 from fastapi import Depends, HTTPException, status
@@ -114,8 +117,46 @@ def get_current_admin_user(current_user: User = Depends(get_current_user)) -> Us
 # User helpers
 # ---------------------------------------------------------------------------
 
+RESET_TOKEN_EXPIRE_MINUTES = 30
+
+
+def generate_reset_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def send_reset_email(to_email: str, reset_token: str) -> None:
+    from app.core.config import settings
+    reset_url = f"{settings.FRONTEND_URL}?reset_token={reset_token}"
+
+    if not settings.SMTP_HOST:
+        logger.info(f"[DEV] Password reset link for {to_email}: {reset_url}")
+        return
+
+    body = (
+        f"Hi,\n\nClick the link below to reset your PHIL password "
+        f"(expires in {RESET_TOKEN_EXPIRE_MINUTES} minutes):\n\n{reset_url}\n\n"
+        f"If you didn't request this, you can ignore this email."
+    )
+    msg = MIMEText(body)
+    msg["Subject"] = "Reset your PHIL password"
+    msg["From"] = settings.FROM_EMAIL
+    msg["To"] = to_email
+
+    try:
+        with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT) as smtp:
+            smtp.starttls()
+            smtp.login(settings.SMTP_USER, settings.SMTP_PASSWORD)
+            smtp.send_message(msg)
+        logger.info(f"Password reset email sent to {to_email}")
+    except Exception as exc:
+        logger.error(f"Failed to send reset email to {to_email}: {exc}")
+        raise
+
+
 def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
     user = db.query(User).filter(User.email == email).first()
-    if not user or not verify_password(password, user.hashed_password):
+    if not user or not user.hashed_password:
+        return None
+    if not verify_password(password, user.hashed_password):
         return None
     return user

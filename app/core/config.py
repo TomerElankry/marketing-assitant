@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""
 
+    # Email (SMTP) — for password reset emails
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    FROM_EMAIL: str = "noreply@phil.app"
+    FRONTEND_URL: str = "http://localhost:5173"
+
     # Auth / JWT
     SECRET_KEY: str = "changeme-generate-a-strong-secret-in-production"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 8  # 8 hours
