@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls:*)",
+      "Bash(pip install:*)",
+      "Bash(curl:*)",
+      "Bash(open:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: reliability improvements, dynamic PPTX theming, and dev skills\n\nBackend fixes & reliability:\n- Fix API route mismatch: router now mounts at /api/v1 via settings.API_V1_STR\n- Fix duplicate created_at key in get_job_status response\n- Add CORS middleware with configurable CORS_ALLOW_ORIGINS setting\n- Add failed_step + error_message columns to Job model with DB indexes on status/created_at\n- Configure DB connection pool \\(pool_size, max_overflow, pool_pre_ping\\)\n- Add async timeouts to dual-research and triple-analysis gather calls\n- Add retry logic with tenacity \\(exponential backoff\\) to all external API calls\n- Replace all print\\(\\) statements with structured logging throughout backend\n- Fix temp PPTX path to use tempfile.NamedTemporaryFile \\(cross-platform safe\\)\n- Graceful Perplexity degradation: job continues with Gemini-only if key is invalid\n- Surface failed_step and error_message in /api/v1/jobs/{id} status response\n- Move all hardcoded model names and config into settings \\(GPT_MODEL, GEMINI_MODEL, etc.\\)\n- Pin all dependency versions in requirements.txt; add tenacity==9.0.0\n\nFrontend fixes:\n- Fix all API URLs from /api/* to /api/v1/* across JobForm, StatusDashboard, ResultsView\n- Adaptive polling backoff in StatusDashboard \\(2s → 4s → … → 30s cap\\)\n- Show failed_step and error_message in the failure UI card\n\nDynamic PPTX design:\n- Replace generate_pptx\\(\\) with brand-adaptive themed renderer\n- Add _derive_theme\\(\\): maps industry \\(25+ keywords\\) → color palette and tone modifiers\n- Title slide: accent sidebar, brand name, rule, large title, subtitle, URL\n- Content slides: accent stripe header, pip bullets, footer watermark\n- Hooks slide: alternating primary/secondary callout boxes with edge stripes\n- Next Steps slide: content layout + channel pills row at bottom\n- Pass questionnaire to generate_pptx\\(\\) from workflow.py for theme derivation\n\nDev skills \\(/.claude/commands/\\):\n- /dev — start/restart full local stack \\(backend + frontend + Docker check\\)\n- /run-job — submit and poll a job end-to-end from the CLI\n- /check-job — inspect a specific job or list recent jobs from DB\n- /test-pptx — instant themed PPTX preview without calling GPT-4o\n- /logs — tail and filter backend logs by job ID or level\n- /add-industry — add a new industry palette to the theme system\n- /db-status — show job counts by status and recent failures\n\nCo-Authored-By: Claude Opus 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push:*)",
+      "Bash(gh pr create:*)",
+      "Bash(grep:*)",
+      "Bash(python3:*)",
+      "Bash(pkill:*)",
+      "Bash(docker ps --format \"table {{.Names}}\\\\t{{.Status}}\")",
+      "Bash(pip3 show uvicorn)",
+      "Bash(pip show uvicorn)",
+      "Bash(.venv/bin/pip install -r requirements.txt)",
+      "Bash(.venv/bin/pip install --upgrade pip -q)",
+      "Bash(/opt/homebrew/bin/npm --version)",
+      "Bash(bash -c \"PATH=''/opt/homebrew/opt/node@24/bin:$PATH'' npm run dev > /tmp/frontend.log 2>&1 &\")",
+      "Bash(app/services/consensus_service.py:*)",
+      "Bash(bash -c 'export PATH=\"\"/opt/homebrew/opt/node@24/bin:$PATH\"\" && npx tsc --noEmit 2>&1')",
+      "Bash(bash -c 'export PATH=\"\"/opt/homebrew/opt/node@24/bin:$PATH\"\" && cd /Users/tomerelankry/Desktop/Work/marketing_assistant2/.claude/worktrees/hungry-hellman/frontend && npx tsc -b 2>&1 | head -30')",
+      "Bash(bash -c 'export PATH=\"\"/opt/homebrew/opt/node@24/bin:$PATH\"\" && cd /Users/tomerelankry/Desktop/Work/marketing_assistant2/.claude/worktrees/hungry-hellman/frontend && npx tsc -b 2>&1 | head -20')",
+      "Bash(bash -c 'export PATH=\"\"/opt/homebrew/opt/node@24/bin:$PATH\"\" && cd /Users/tomerelankry/Desktop/Work/marketing_assistant2/.claude/worktrees/hungry-hellman/frontend && git stash && npx tsc -b 2>&1 | grep \"\"JobForm\"\" | head -5')",
+      "Bash(bash -c 'cd /Users/tomerelankry/Desktop/Work/marketing_assistant2/.claude/worktrees/hungry-hellman && .venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload > /tmp/backend.log 2>&1 &')",
+      "Bash(bash -c '.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload > /tmp/backend.log 2>&1 &')",
+      "Bash(bash -c 'export PATH=\"\"/opt/homebrew/opt/node@24/bin:$PATH\"\" && npx vite > /tmp/frontend.log 2>&1 &')",
+      "Bash(bash -c 'export PATH=\"\"/opt/homebrew/opt/node@24/bin:$PATH\"\" && cd /Users/tomerelankry/Desktop/Work/marketing_assistant2/.claude/worktrees/hungry-hellman/frontend && npx vite > /tmp/frontend.log 2>&1 &')",
+      "Bash(git add docs/prd.md docs/architecture.md docs/frd.md README.md .claude/settings.local.json app/api/endpoints.py app/api/admin_endpoints.py app/api/auth_endpoints.py app/core/config.py app/db/models.py app/main.py app/schemas/auth.py app/services/auth_service.py app/services/brand_audit_service.py app/services/consensus_service.py app/services/gemini_research_service.py app/services/multi_analysis_service.py app/services/research_consolidator.py app/services/research_service.py app/services/storage_service.py app/services/workflow.py frontend/src/App.tsx frontend/src/components/AuthPage.tsx frontend/src/components/JobForm.tsx frontend/src/components/ResultsView.tsx frontend/src/components/StatusDashboard.tsx frontend/src/context/ frontend/src/lib/ frontend/src/types.ts requirements.txt)",
+      "Bash(git commit:*)",
+      "Bash(python -c \":*)",
+      "Bash(.venv/bin/python -c \":*)",
+      "Bash(/usr/local/bin/docker ps --format \"table {{.Names}}\\\\t{{.Status}}\")",
+      "Bash(/Applications/Docker.app/Contents/Resources/bin/docker ps --format \"table {{.Names}}\\\\t{{.Status}}\")",
+      "Bash(.venv/bin/python -c \"import py_compile; py_compile.compile\\(''app/services/presentation_service.py'', doraise=True\\)\")",
+      "Bash(.venv/bin/python3 -c \":*)"
+    ]
+  }
+}

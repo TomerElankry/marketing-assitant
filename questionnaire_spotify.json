@@ -1,0 +1,40 @@
+{
+  "project_metadata": {
+    "brand_name": "Spotify",
+    "website_url": "https://www.spotify.com",
+    "target_country": "United States",
+    "industry": "Music Streaming / Entertainment"
+  },
+  "product_definition": {
+    "product_description": "Spotify is the world's largest audio streaming platform, offering on-demand access to over 100 million songs, podcasts, and audiobooks. Available on every device, Spotify connects listeners with the music and creators they love through personalized recommendations powered by AI.",
+    "core_problem_solved": "Music discovery is broken — people get stuck in listening loops, miss emerging artists they'd love, and jump between apps and platforms. Spotify unifies all audio content in one place with algorithmic personalization that learns your taste better than any human DJ.",
+    "unique_selling_proposition": "The only platform that genuinely knows you — Discover Weekly, Wrapped, and AI DJ create a soundtrack that evolves with your life, not just a catalog you scroll through."
+  },
+  "target_audience": {
+    "demographics": "Primary: Gen Z and Millennials aged 16-34, digitally native, mobile-first. Secondary: 35-50 professionals using Spotify during commutes, workouts, and focus sessions. Global reach across 180+ markets, English-speaking markets as primary revenue driver.",
+    "psychographics": "Music is identity — listeners use Spotify to signal taste, discover culture, and create emotional moments. Highly engaged with playlists, share-worthy features like Wrapped, and emerging artists. Value personalization, curation, and seamlessness across devices.",
+    "cultural_nuances": "Gen Z distrusts corporate music brands — authenticity and artist support matter. Growing backlash around artist royalty rates creates sensitivity around messaging. 'Music discovery' is a social currency — finding an artist before they're mainstream is a status signal."
+  },
+  "market_context": {
+    "main_competitors": [
+      "Apple Music",
+      "YouTube Music",
+      "Amazon Music",
+      "Tidal",
+      "SoundCloud"
+    ],
+    "current_marketing_efforts": "Spotify Wrapped annual campaign (viral social moment), partnership with major artists for exclusive content, podcast original programming, AI DJ feature promotion, student discount campaigns, and social-first content marketing on TikTok and Instagram.",
+    "known_customer_objections": "Sound quality inferior to Apple Music (no lossless by default); artist royalty controversy makes ethically-minded fans feel guilty; free tier ads are disruptive; price increases have eroded value perception; podcast pivot felt forced and off-brand to music purists."
+  },
+  "the_creative_goal": {
+    "primary_objective": "Recapture churned premium subscribers lost to Apple Music and Amazon Music by reinforcing Spotify's unmatched personalization and cultural relevance — targeting a 15% reduction in premium churn rate.",
+    "desired_tone_of_voice": "Bold, Culturally-savvy, Playful yet Authentic, Creator-first.",
+    "specific_channels": [
+      "TikTok",
+      "Instagram Reels",
+      "YouTube Pre-roll",
+      "Spotify Audio Ads (in-app)",
+      "Out-of-Home (OOH)"
+    ]
+  }
+}

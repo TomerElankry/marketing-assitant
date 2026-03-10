@@ -33,3 +33,14 @@ class QuestionnaireRequest(BaseModel):
     target_audience: TargetAudience
     market_context: MarketContext
     the_creative_goal: CreativeGoal
+
+
+class CampaignCreateRequest(BaseModel):
+    """Slim request for creating a campaign against an existing client.
+    Channels are determined by AI — not provided by the user.
+    """
+    client_id: str
+    campaign_name: str
+    campaign_description: Optional[str] = None
+    primary_objective: str = Field(..., description="e.g., Awareness, Rebranding, Lead gen")
+    desired_tone_of_voice: str = Field(..., description="e.g., Bold, Professional, Humorous")

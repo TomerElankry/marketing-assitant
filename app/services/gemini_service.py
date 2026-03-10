@@ -6,6 +6,46 @@ from app.schemas.questionnaire import QuestionnaireRequest
 # Configure API Key (Best practice: Move this to a lifespan event or config init, but global here is fine for MVP)
 genai.configure(api_key=settings.GEMINI_API_KEY)
 
+def recommend_channels(
+    primary_objective: str,
+    desired_tone_of_voice: str,
+    industry: str,
+    demographics: str,
+    psychographics: str,
+) -> list:
+    """
+    Uses Gemini to recommend the best marketing channels for a campaign
+    based on the objective, tone, and client audience profile.
+    Returns a list of channel names (e.g. ["TikTok", "Instagram"]).
+    Falls back to sensible defaults on error.
+    """
+    model = genai.GenerativeModel("gemini-2.0-flash")
+
+    prompt = f"""You are a senior media strategist. Based on the campaign details below,
+recommend the 3-5 most effective marketing channels. Return ONLY a raw JSON array of
+channel name strings (no markdown, no explanation).
+
+Campaign Objective: {primary_objective}
+Tone of Voice: {desired_tone_of_voice}
+Industry: {industry}
+Target Demographics: {demographics}
+Target Psychographics: {psychographics}
+
+Example output: ["TikTok", "Instagram", "YouTube"]"""
+
+    try:
+        response = model.generate_content(prompt)
+        clean_text = response.text.replace("```json", "").replace("```", "").strip()
+        channels = json.loads(clean_text)
+        if isinstance(channels, list) and channels:
+            return channels
+    except Exception as e:
+        print(f"Gemini channel recommendation error: {e}")
+
+    # Sensible default fallback
+    return ["Instagram", "LinkedIn", "YouTube"]
+
+
 def validate_questionnaire(data: QuestionnaireRequest) -> dict:
     """
     Sends the questionnaire data to Gemini to validate coherence and depth.

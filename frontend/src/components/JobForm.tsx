@@ -3,9 +3,10 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import axios from 'axios';
-import { Upload, Plus, Trash2, Send, Loader2, ArrowRight, ArrowLeft } from 'lucide-react';
+import api from '../lib/api';
+import { Upload, Plus, Trash2, Send, Loader2, ArrowRight, ArrowLeft, AlertCircle, CheckCircle2 } from 'lucide-react';
 
-// --- Zod Schema (Same as before) ---
+// --- Zod Schema ---
 const schema = z.object({
     project_metadata: z.object({
         brand_name: z.string().min(1, "Brand name is required"),
@@ -37,24 +38,73 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-interface JobFormProps {
-    onJobCreated: (jobId: string) => void;
+interface StepDef {
+    label: string;
+    subtitle: string;
+    fields: string[];
 }
 
-const STEPS = [
-    { title: "Identity", description: "Who are you?" },
-    { title: "Market", description: "Who is it for?" },
-    { title: "Launch", description: "What is the goal?" },
+const STEPS: StepDef[] = [
+    {
+        label: "Project",
+        subtitle: "Basic brand info",
+        fields: [
+            "project_metadata.brand_name",
+            "project_metadata.website_url",
+            "project_metadata.target_country",
+            "project_metadata.industry",
+        ],
+    },
+    {
+        label: "Product",
+        subtitle: "What you're selling",
+        fields: [
+            "product_definition.product_description",
+            "product_definition.core_problem_solved",
+            "product_definition.unique_selling_proposition",
+        ],
+    },
+    {
+        label: "Audience",
+        subtitle: "Who you're targeting",
+        fields: [
+            "target_audience.demographics",
+            "target_audience.psychographics",
+        ],
+    },
+    {
+        label: "Market",
+        subtitle: "Competitive landscape",
+        fields: ["market_context.main_competitors"],
+    },
+    {
+        label: "Goals",
+        subtitle: "Creative direction",
+        fields: [
+            "the_creative_goal.primary_objective",
+            "the_creative_goal.desired_tone_of_voice",
+            "the_creative_goal.specific_channels",
+        ],
+    },
 ];
 
-const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
+interface JobFormProps {
+    onJobCreated: (jobId: string) => void;
+    initialData?: FormData;
+}
+
+const JobForm: React.FC<JobFormProps> = ({ onJobCreated, initialData }) => {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [step, setStep] = useState(0);
+    const isEditing = !!initialData;
+    const [currentStep, setCurrentStep] = useState(0);
+    const [completedSteps, setCompletedSteps] = useState<Set<number>>(
+        isEditing ? new Set([0, 1, 2, 3, 4]) : new Set()
+    );
 
     const { register, control, handleSubmit, trigger, reset, formState: { errors } } = useForm<FormData>({
         resolver: zodResolver(schema),
-        defaultValues: {
+        defaultValues: initialData ?? {
             project_metadata: { brand_name: '', website_url: '', target_country: '', industry: '' },
             product_definition: { product_description: '', core_problem_solved: '', unique_selling_proposition: '' },
             target_audience: { demographics: '', psychographics: '', cultural_nuances: '' },
@@ -66,63 +116,33 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
     const competitors = useFieldArray({ control, name: "market_context.main_competitors" as any });
     const channels = useFieldArray({ control, name: "the_creative_goal.specific_channels" as any });
 
-    // Validate current step before moving next
-    const nextStep = async () => {
-        let fieldsToValidate: any[] = [];
-        if (step === 0) {
-            fieldsToValidate = ["project_metadata", "product_definition"];
-        } else if (step === 1) {
-            fieldsToValidate = ["target_audience", "market_context"];
+    const handleNext = async () => {
+        const fields = STEPS[currentStep].fields as any[];
+        const valid = await trigger(fields);
+        if (valid) {
+            setCompletedSteps(prev => new Set([...prev, currentStep]));
+            setCurrentStep(s => s + 1);
         }
-
-        const isValid = await trigger(fieldsToValidate);
-        if (isValid) setStep((s) => s + 1);
     };
 
-    const prevStep = () => setStep((s) => s - 1);
+    const handleBack = () => setCurrentStep(s => s - 1);
 
     const onSubmit = async (data: FormData) => {
         setLoading(true);
         setError(null);
         try {
-            console.log('Submitting job with data:', data);
-            const response = await axios.post('/api/jobs', data, {
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-            console.log('Response received:', response.status, response.data);
+            const response = await api.post('/jobs', data);
             if (response.status === 201) {
                 onJobCreated(response.data.job_id);
             }
         } catch (err: any) {
-            console.error('Error submitting job:', err);
             if (axios.isAxiosError(err)) {
-                console.error('Axios error details:', {
-                    status: err.response?.status,
-                    statusText: err.response?.statusText,
-                    data: err.response?.data,
-                    url: err.config?.url,
-                });
-                
-                if (err.response?.status === 404) {
-                    setError(`404 Not Found: ${err.config?.url}. Make sure the backend is running on port 8000.`);
-                } else if (err.response?.status === 400) {
-                    // Validation error from backend
-                    const detail = err.response.data?.detail;
-                    if (detail && typeof detail === 'object' && 'feedback' in detail) {
-                        setError(`Validation failed: ${Array.isArray(detail.feedback) ? detail.feedback.join(' ') : JSON.stringify(detail)}`);
-                    } else {
-                        setError(`Validation error: ${JSON.stringify(detail || err.response.data)}`);
-                    }
-                } else {
-                    const msg = err.response?.data?.detail
-                        ? JSON.stringify(err.response.data.detail)
-                        : err.message || `Request failed with status code ${err.response?.status || 'unknown'}`;
-                    setError(msg);
-                }
+                const msg = err.response?.data?.detail
+                    ? JSON.stringify(err.response.data.detail)
+                    : err.message;
+                setError(msg);
             } else {
-                setError(`Network error: ${err.message || 'Unknown error'}. Is the backend running?`);
+                setError("Network error. Is the backend running?");
             }
         } finally {
             setLoading(false);
@@ -131,251 +151,282 @@ const JobForm: React.FC<JobFormProps> = ({ onJobCreated }) => {
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (!file) {
-            setError("No file selected.");
-            return;
-        }
-
-        // Check file type
-        if (!file.name.endsWith('.json') && file.type !== 'application/json') {
-            setError("Please select a JSON file.");
-            e.target.value = '';
-            return;
-        }
-
+        if (!file) return;
         const reader = new FileReader();
-        reader.onerror = () => {
-            setError("Failed to read file.");
-            e.target.value = '';
-        };
         reader.onload = (event) => {
             try {
-                const result = event.target?.result;
-                if (!result) {
-                    setError("File is empty.");
-                    e.target.value = '';
-                    return;
-                }
-                const json = JSON.parse(result as string);
+                const json = JSON.parse(event.target?.result as string);
                 if (json.project_metadata) {
                     reset(json);
+                    setCompletedSteps(new Set([0, 1, 2, 3, 4]));
+                    setCurrentStep(4);
                     setError(null);
-                    setStep(2); // Jump to end for review
-                    console.log("JSON file imported successfully");
                 } else {
-                    setError("Invalid JSON structure. Missing 'project_metadata' field.");
+                    setError("Invalid JSON structure. Missing project_metadata?");
                 }
-            } catch (err) {
-                console.error("JSON parse error:", err);
-                setError(`Failed to parse JSON file: ${err instanceof Error ? err.message : 'Unknown error'}`);
-            } finally {
-                e.target.value = '';
+            } catch {
+                setError("Failed to parse JSON file.");
             }
         };
         reader.readAsText(file);
+        e.target.value = '';
     };
 
-    return (
-        <div className="max-w-4xl mx-auto">
-            {/* Glass Container */}
-            <div className="relative bg-slate-900/60 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+    const stepTitles = [
+        "Project Metadata",
+        "Product Definition",
+        "Target Audience",
+        "Market Context",
+        "Creative Goal",
+    ];
 
-                {/* Progress Header */}
-                <div className="bg-slate-950/50 border-b border-white/5 p-6">
-                    <div className="flex justify-between items-center mb-6">
-                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                            <span className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-sm">
-                                {step + 1}
-                            </span>
-                            {STEPS[step].title}
-                        </h2>
-                        {/* File Upload Button */}
-                        <div className="relative group">
-                            <input type="file" accept=".json,application/json" onChange={handleFileUpload} className="hidden" id="file-upload" />
-                            <label htmlFor="file-upload" className="flex items-center gap-2 px-3 py-1.5 bg-slate-800 hover:bg-slate-700 rounded-lg cursor-pointer transition-colors text-xs font-medium border border-slate-700 text-slate-400 group-hover:text-white">
-                                <Upload size={14} /> Import JSON
-                            </label>
+    return (
+        <div className="max-w-2xl mx-auto">
+
+            {/* Import JSON */}
+            <div className="flex justify-end mb-4">
+                <input type="file" accept=".json,application/json" onChange={handleFileUpload} className="hidden" id="file-upload" />
+                <label
+                    htmlFor="file-upload"
+                    className="btn-ghost text-xs cursor-pointer"
+                >
+                    <Upload size={13} /> Import JSON
+                </label>
+            </div>
+
+            {/* Step Progress */}
+            <div className="warm-card mb-6 p-5">
+                <div className="flex items-center justify-between">
+                    {STEPS.map((step, index) => {
+                        const isCompleted = completedSteps.has(index);
+                        const isActive = index === currentStep;
+                        const isFuture = index > currentStep && !completedSteps.has(index);
+                        return (
+                            <React.Fragment key={index}>
+                                <button
+                                    type="button"
+                                    onClick={() => { if (isCompleted || index < currentStep) setCurrentStep(index); }}
+                                    disabled={isFuture}
+                                    className={`flex flex-col items-center gap-1.5 transition-all ${isFuture ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}
+                                >
+                                    <div className={`
+                                        w-9 h-9 rounded-xl flex items-center justify-center border-2 transition-all duration-300 text-sm font-bold
+                                        ${isCompleted
+                                            ? 'bg-emerald-50 border-emerald-400 text-emerald-600'
+                                            : isActive
+                                                ? 'bg-[#1E3A5F]/8 border-[#1E3A5F] text-[#1E3A5F] scale-110'
+                                                : 'bg-white border-[#E7E5E4] text-[#A8A29E]'}
+                                    `}>
+                                        {isCompleted ? <CheckCircle2 size={16} /> : <span>{index + 1}</span>}
+                                    </div>
+                                    <div className="text-center hidden sm:block">
+                                        <p className={`text-xs font-semibold ${isActive ? 'text-[#1E3A5F]' : isCompleted ? 'text-emerald-600' : 'text-[#A8A29E]'}`}>
+                                            {step.label}
+                                        </p>
+                                        <p className="text-[10px] text-[#C4B5A0]">{step.subtitle}</p>
+                                    </div>
+                                </button>
+                                {index < STEPS.length - 1 && (
+                                    <div className={`flex-1 h-0.5 mx-2 rounded-full transition-all duration-500 ${completedSteps.has(index) ? 'bg-emerald-300' : 'bg-[#E7E5E4]'}`} />
+                                )}
+                            </React.Fragment>
+                        );
+                    })}
+                </div>
+                <p className="text-center text-xs text-[#A8A29E] mt-4">Step {currentStep + 1} of {STEPS.length}</p>
+            </div>
+
+            {/* Form Panel */}
+            <form onSubmit={handleSubmit(onSubmit)}>
+                <div className="warm-card p-8">
+
+                    {/* Step Header */}
+                    <div className="mb-6 pb-5 border-b border-[#F0EDEB]">
+                        <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-[#1E3A5F]/8 flex items-center justify-center">
+                                <span className="text-sm font-bold text-[#1E3A5F]">{currentStep + 1}</span>
+                            </div>
+                            <div>
+                                <h2 className="text-xl font-bold text-[#1C1917]">{stepTitles[currentStep]}</h2>
+                                <p className="text-xs text-[#78716C]">{STEPS[currentStep].subtitle}</p>
+                            </div>
                         </div>
                     </div>
 
-                    {/* Stepper Visual */}
-                    <div className="flex gap-2">
-                        {STEPS.map((s, i) => (
-                            <div key={i} className="flex-1 h-1 rounded-full bg-slate-800 overflow-hidden">
-                                <div
-                                    className={`h-full transition-all duration-500 ease-out ${i <= step ? 'bg-blue-500' : 'bg-transparent'}`}
-                                    style={{ width: i < step ? '100%' : i === step ? '100%' : '0%' }}
-                                />
+                    <div className="space-y-5">
+
+                        {/* Step 1: Project */}
+                        {currentStep === 0 && (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <WInput label="Brand Name" registration={register("project_metadata.brand_name")} error={errors.project_metadata?.brand_name} placeholder="e.g. Acme Corp" />
+                                <WInput label="Website URL" registration={register("project_metadata.website_url")} error={errors.project_metadata?.website_url} placeholder="https://example.com" />
+                                <WInput label="Target Country" registration={register("project_metadata.target_country")} error={errors.project_metadata?.target_country} placeholder="e.g. United States" />
+                                <WInput label="Industry" registration={register("project_metadata.industry")} error={errors.project_metadata?.industry} placeholder="e.g. SaaS, E-commerce" />
                             </div>
-                        ))}
+                        )}
+
+                        {/* Step 2: Product */}
+                        {currentStep === 1 && (
+                            <>
+                                <WTextArea label="Product Description" registration={register("product_definition.product_description")} error={errors.product_definition?.product_description} placeholder="Describe your product or service in detail..." />
+                                <WInput label="Core Problem Solved" registration={register("product_definition.core_problem_solved")} error={errors.product_definition?.core_problem_solved} placeholder="What pain point does it eliminate?" />
+                                <WInput label="Unique Selling Proposition" registration={register("product_definition.unique_selling_proposition")} error={errors.product_definition?.unique_selling_proposition} placeholder="What makes you different from competitors?" />
+                            </>
+                        )}
+
+                        {/* Step 3: Audience */}
+                        {currentStep === 2 && (
+                            <>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <WInput label="Demographics" registration={register("target_audience.demographics")} error={errors.target_audience?.demographics} placeholder="Age, gender, income, location..." />
+                                    <WInput label="Psychographics" registration={register("target_audience.psychographics")} error={errors.target_audience?.psychographics} placeholder="Values, interests, lifestyle..." />
+                                </div>
+                                <WInput label="Cultural Nuances (Optional)" registration={register("target_audience.cultural_nuances")} placeholder="Any cultural context to consider?" />
+                            </>
+                        )}
+
+                        {/* Step 4: Market */}
+                        {currentStep === 3 && (
+                            <>
+                                <div>
+                                    <label className="block text-xs font-semibold text-[#78716C] mb-2 uppercase tracking-wider">Main Competitors</label>
+                                    <div className="space-y-2">
+                                        {competitors.fields.map((field, index) => (
+                                            <div key={field.id} className="flex gap-2">
+                                                <input
+                                                    {...register(`market_context.main_competitors.${index}` as const)}
+                                                    className="warm-input flex-1"
+                                                    placeholder="Competitor name"
+                                                    defaultValue={(field as any).name}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => competitors.remove(index)}
+                                                    className="px-3 border border-[#E7E5E4] rounded-lg text-[#A8A29E] hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => (competitors.append as (v: string) => void)("")}
+                                        className="mt-2 text-xs flex items-center gap-1.5 text-[#1E3A5F] hover:text-[#D97706] transition-colors font-medium"
+                                    >
+                                        <Plus size={13} /> Add Competitor
+                                    </button>
+                                    {errors.market_context?.main_competitors && (
+                                        <p className="text-xs text-red-600 flex items-center gap-1 mt-1"><AlertCircle size={11} /> {errors.market_context.main_competitors.message}</p>
+                                    )}
+                                </div>
+                                <WInput label="Current Marketing Efforts (Optional)" registration={register("market_context.current_marketing_efforts")} placeholder="What are you currently doing to market?" />
+                                <WInput label="Known Customer Objections (Optional)" registration={register("market_context.known_customer_objections")} placeholder="Common reasons people don't buy..." />
+                            </>
+                        )}
+
+                        {/* Step 5: Goals */}
+                        {currentStep === 4 && (
+                            <>
+                                <WInput label="Primary Objective" registration={register("the_creative_goal.primary_objective")} error={errors.the_creative_goal?.primary_objective} placeholder="e.g. Drive sign-ups, Increase brand awareness" />
+                                <WInput label="Desired Tone of Voice" registration={register("the_creative_goal.desired_tone_of_voice")} error={errors.the_creative_goal?.desired_tone_of_voice} placeholder="e.g. Professional, playful, bold..." />
+                                <div>
+                                    <label className="block text-xs font-semibold text-[#78716C] mb-2 uppercase tracking-wider">Marketing Channels</label>
+                                    <div className="space-y-2">
+                                        {channels.fields.map((field, index) => (
+                                            <div key={field.id} className="flex gap-2">
+                                                <input
+                                                    {...register(`the_creative_goal.specific_channels.${index}` as const)}
+                                                    className="warm-input flex-1"
+                                                    placeholder="e.g. TikTok, LinkedIn, Email"
+                                                    defaultValue={(field as any).name}
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => channels.remove(index)}
+                                                    className="px-3 border border-[#E7E5E4] rounded-lg text-[#A8A29E] hover:text-red-500 hover:border-red-200 hover:bg-red-50 transition-colors"
+                                                >
+                                                    <Trash2 size={14} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => (channels.append as (v: string) => void)("")}
+                                        className="mt-2 text-xs flex items-center gap-1.5 text-[#1E3A5F] hover:text-[#D97706] transition-colors font-medium"
+                                    >
+                                        <Plus size={13} /> Add Channel
+                                    </button>
+                                    {errors.the_creative_goal?.specific_channels && (
+                                        <p className="text-xs text-red-600 flex items-center gap-1 mt-1"><AlertCircle size={11} /> {errors.the_creative_goal.specific_channels.message}</p>
+                                    )}
+                                </div>
+                            </>
+                        )}
+
+                        {error && (
+                            <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg flex items-start gap-2 text-sm">
+                                <AlertCircle size={15} className="shrink-0 mt-0.5" />
+                                <span>{error}</span>
+                            </div>
+                        )}
+
+                        {/* Navigation */}
+                        <div className="flex items-center justify-between pt-2 border-t border-[#F0EDEB]">
+                            <button
+                                type="button"
+                                onClick={handleBack}
+                                disabled={currentStep === 0}
+                                className="btn-ghost text-sm disabled:opacity-30 disabled:cursor-not-allowed"
+                            >
+                                <ArrowLeft size={14} /> Back
+                            </button>
+
+                            {currentStep < STEPS.length - 1 ? (
+                                <button
+                                    type="button"
+                                    onClick={handleNext}
+                                    className="btn-primary text-sm"
+                                >
+                                    Next Step
+                                    <ArrowRight size={14} />
+                                </button>
+                            ) : (
+                                <button
+                                    type="submit"
+                                    disabled={loading}
+                                    className="btn-accent text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    {loading ? (
+                                        <><Loader2 className="animate-spin" size={14} /> Launching…</>
+                                    ) : (
+                                        <><Send size={14} /> Launch Analysis</>
+                                    )}
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
-
-                {error && (
-                    <div className="mx-6 mt-6 p-4 bg-red-500/10 border border-red-500/50 text-red-200 rounded-lg text-sm">
-                        {error}
-                    </div>
-                )}
-
-                <form onSubmit={handleSubmit(onSubmit)} className="p-6 md:p-8 animate-fadeIn">
-
-                    {/* Step 1: Identity & Product */}
-                    {step === 0 && (
-                        <div className="space-y-6 animate-slideUp">
-                            <section className="space-y-4">
-                                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Project Identity</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <Input label="Brand Name" registration={register("project_metadata.brand_name")} error={errors.project_metadata?.brand_name} placeholder="Acme Corp" />
-                                    <Input label="Website URL" registration={register("project_metadata.website_url")} error={errors.project_metadata?.website_url} placeholder="https://acme.com" />
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <Input label="Target Country" registration={register("project_metadata.target_country")} error={errors.project_metadata?.target_country} placeholder="United States" />
-                                    <Input label="Industry" registration={register("project_metadata.industry")} error={errors.project_metadata?.industry} placeholder="SaaS / E-commerce" />
-                                </div>
-                            </section>
-
-                            <section className="space-y-4">
-                                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Product</h3>
-                                <TextArea label="Product Description" registration={register("product_definition.product_description")} error={errors.product_definition?.product_description} placeholder="Describe what you are selling in detail..." />
-                                <Input label="Core Problem Solved" registration={register("product_definition.core_problem_solved")} error={errors.product_definition?.core_problem_solved} />
-                                <Input label="Unique Selling Proposition" registration={register("product_definition.unique_selling_proposition")} error={errors.product_definition?.unique_selling_proposition} />
-                            </section>
-                        </div>
-                    )}
-
-                    {/* Step 2: Audience & Market */}
-                    {step === 1 && (
-                        <div className="space-y-6 animate-slideUp">
-                            <section className="space-y-4">
-                                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Target Audience</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <Input label="Demographics" registration={register("target_audience.demographics")} error={errors.target_audience?.demographics} placeholder="Age 25-40, Urban professionals" />
-                                    <Input label="Psychographics" registration={register("target_audience.psychographics")} error={errors.target_audience?.psychographics} placeholder="Ambitious, tech-savvy, values time" />
-                                </div>
-                                <Input label="Cultural Nuances (Optional)" registration={register("target_audience.cultural_nuances")} />
-                            </section>
-
-                            <section className="space-y-4">
-                                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Competition</h3>
-                                <div className="space-y-2">
-                                    <label className="block text-xs font-medium text-slate-400">Main Competitors</label>
-                                    {competitors.fields.map((field, index) => (
-                                        <div key={field.id} className="flex gap-2">
-                                            <input
-                                                {...register(`market_context.main_competitors.${index}` as const)}
-                                                className="flex-1 bg-slate-950/50 border border-slate-700/50 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-200"
-                                                placeholder="Competitor Name"
-                                                defaultValue={(field as any).name}
-                                            />
-                                            <button type="button" onClick={() => competitors.remove(index)} className="text-slate-500 hover:text-red-400">
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    ))}
-                                    <button type="button" onClick={() => competitors.append("New Competitor")} className="text-xs flex items-center gap-1 text-blue-400 hover:text-blue-300">
-                                        <Plus size={14} /> Add Competitor
-                                    </button>
-                                    {errors.market_context?.main_competitors && <p className="text-xs text-red-400 mt-1">{errors.market_context.main_competitors.message}</p>}
-                                </div>
-                            </section>
-                        </div>
-                    )}
-
-                    {/* Step 3: Goals */}
-                    {step === 2 && (
-                        <div className="space-y-6 animate-slideUp">
-                            <section className="space-y-4">
-                                <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Campaign Goals</h3>
-                                <Input label="Primary Objective" registration={register("the_creative_goal.primary_objective")} error={errors.the_creative_goal?.primary_objective} placeholder="Brand Awareness / Lead Gen" />
-                                <Input label="Desired Tone" registration={register("the_creative_goal.desired_tone_of_voice")} error={errors.the_creative_goal?.desired_tone_of_voice} placeholder="Professional, Witty, Urgent" />
-
-                                <div className="space-y-2">
-                                    <label className="block text-xs font-medium text-slate-400">Channels</label>
-                                    {channels.fields.map((field, index) => (
-                                        <div key={field.id} className="flex gap-2">
-                                            <input
-                                                {...register(`the_creative_goal.specific_channels.${index}` as const)}
-                                                className="flex-1 bg-slate-950/50 border border-slate-700/50 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500/50 outline-none text-slate-200"
-                                                placeholder="e.g. LinkedIn"
-                                                defaultValue={(field as any).name}
-                                            />
-                                            <button type="button" onClick={() => channels.remove(index)} className="text-slate-500 hover:text-red-400">
-                                                <Trash2 size={16} />
-                                            </button>
-                                        </div>
-                                    ))}
-                                    <button type="button" onClick={() => channels.append("New Channel")} className="text-xs flex items-center gap-1 text-blue-400 hover:text-blue-300">
-                                        <Plus size={14} /> Add Channel
-                                    </button>
-                                    {errors.the_creative_goal?.specific_channels && <p className="text-xs text-red-400 mt-1">{errors.the_creative_goal.specific_channels.message}</p>}
-                                </div>
-                            </section>
-                        </div>
-                    )}
-
-                    {/* Navigation Buttons */}
-                    <div className="flex justify-between items-center mt-10 pt-6 border-t border-white/5">
-                        {step > 0 ? (
-                            <button
-                                type="button"
-                                onClick={prevStep}
-                                className="flex items-center gap-2 px-4 py-2 text-slate-400 hover:text-white transition-colors"
-                            >
-                                <ArrowLeft size={16} /> Back
-                            </button>
-                        ) : (
-                            <div></div>
-                        )}
-
-                        {step < STEPS.length - 1 ? (
-                            <button
-                                type="button"
-                                onClick={nextStep}
-                                className="flex items-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg shadow-lg shadow-blue-900/20 transition-all hover:scale-105"
-                            >
-                                Next Step <ArrowRight size={16} />
-                            </button>
-                        ) : (
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="flex items-center gap-2 px-8 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg shadow-lg shadow-emerald-900/20 transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {loading ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
-                                {loading ? "Launching Agents..." : "Launch Campaign"}
-                            </button>
-                        )}
-                    </div>
-
-                </form>
-            </div>
+            </form>
         </div>
     );
 };
 
-// UI Helper Components (Styled for Dark Mode)
-const Input = ({ label, registration, error, placeholder }: any) => (
+// Warm Professional Input Components
+const WInput = ({ label, registration, error, placeholder }: any) => (
     <div className="space-y-1.5">
-        <label className="block text-xs font-medium text-slate-400">{label}</label>
-        <input
-            {...registration}
-            placeholder={placeholder}
-            className="w-full bg-slate-950/50 border border-slate-700/50 rounded-lg px-3 py-2.5 text-sm md:text-base focus:ring-2 focus:ring-blue-500/50 outline-none transition-all placeholder-slate-700 text-slate-200"
-        />
-        {error && <p className="text-xs text-red-400 animate-fadeIn">{error.message}</p>}
+        <label className="block text-xs font-semibold text-[#78716C] uppercase tracking-wider">{label}</label>
+        <input {...registration} placeholder={placeholder} className="warm-input" />
+        {error && <p className="text-xs text-red-600 flex items-center gap-1"><AlertCircle size={11} /> {error.message}</p>}
     </div>
 );
 
-const TextArea = ({ label, registration, error, placeholder }: any) => (
+const WTextArea = ({ label, registration, error, placeholder }: any) => (
     <div className="space-y-1.5">
-        <label className="block text-xs font-medium text-slate-400">{label}</label>
-        <textarea
-            {...registration}
-            rows={3}
-            placeholder={placeholder}
-            className="w-full bg-slate-950/50 border border-slate-700/50 rounded-lg px-3 py-2.5 text-sm md:text-base focus:ring-2 focus:ring-blue-500/50 outline-none transition-all placeholder-slate-700 resize-none text-slate-200"
-        />
-        {error && <p className="text-xs text-red-400 animate-fadeIn">{error.message}</p>}
+        <label className="block text-xs font-semibold text-[#78716C] uppercase tracking-wider">{label}</label>
+        <textarea {...registration} rows={4} placeholder={placeholder} className="warm-input resize-none" />
+        {error && <p className="text-xs text-red-600 flex items-center gap-1"><AlertCircle size={11} /> {error.message}</p>}
     </div>
 );
 

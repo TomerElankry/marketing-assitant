@@ -1,113 +1,201 @@
-from sqlalchemy.orm import Session
-from app.db.models import Job, JobStatus
-from app.schemas.questionnaire import QuestionnaireRequest
-from app.services.research_service import research_service
-from app.services.gemini_research_service import gemini_research_service
-from app.services.research_consolidator import research_consolidator
-from app.services.storage_service import storage_service
-from app.services.multi_analysis_service import multi_analysis_service
-from app.services.consensus_service import consensus_service
-from app.services.presentation_service import presentation_service
-from app.db.session import SessionLocal
-import traceback
-import os
 import asyncio
+import logging
+import os
+import tempfile
+import traceback
+
+from sqlalchemy.orm import Session
+
+from app.core.config import settings
+from app.db.models import Job, JobStatus
+from app.db.session import SessionLocal
+from app.schemas.questionnaire import QuestionnaireRequest
+from app.services.brand_audit_service import brand_audit_service
+from app.services.consensus_service import consensus_service
+from app.services.gemini_research_service import gemini_research_service
+from app.services.multi_analysis_service import multi_analysis_service
+from app.services.presentation_service import presentation_service
+from app.services.research_consolidator import research_consolidator
+from app.services.research_service import research_service
+from app.services.storage_service import storage_service
+from app.services.news_research_service import news_research_service
+
+logger = logging.getLogger(__name__)
+
+
+def _fail_job(db: Session, job_id: str, step: str, error: Exception) -> None:
+    """Mark a job as failed with diagnostic info."""
+    try:
+        job = db.query(Job).filter(Job.id == job_id).first()
+        if job:
+            job.status = JobStatus.FAILED
+            job.failed_step = step
+            job.error_message = str(error)[:1000]  # Truncate very long messages
+            db.commit()
+    except Exception:
+        logger.exception(f"[Job {job_id}] Could not update failed status in DB")
+
 
 async def perform_research_workflow(job_id: str, request_data: dict):
     """
     Background task to run deep research and persist results.
-    We create a new DB session here since it's running in the background.
+    A new DB session is created here since it runs outside the request lifecycle.
     """
     db: Session = SessionLocal()
+    step = "init"
     try:
-        print(f"[Job {job_id}] Starting Research Workflow...")
-        
-        # 1. Update Status to RESEARCHING
+        logger.info(f"[Job {job_id}] Starting Research Workflow")
+
+        # 1. Update status to RESEARCHING
+        step = "status_update"
         job = db.query(Job).filter(Job.id == job_id).first()
         if not job:
-            print(f"[Job {job_id}] Job not found in DB!")
+            logger.error(f"[Job {job_id}] Job not found in DB — aborting")
             return
-            
+
         job.status = JobStatus.RESEARCHING
         db.commit()
-        
-        # 2. Run Research (Perplexity + Gemini)
+
+        # 2. Run Quad Research in parallel with timeout:
+        #    - Perplexity: competitor data, USP validation, brand awareness, share of voice
+        #    - Gemini: visual trends, cultural insights, campaign examples, content formats
+        #    - Brand Audit: homepage scrape → current positioning, tone, gaps
+        #    - NewsAPI: press coverage, industry news, competitor announcements
+        #    All except Gemini are optional — failures degrade gracefully.
+        step = "quad_research"
         questionnaire = QuestionnaireRequest(**request_data)
-        
-        print(f"[Job {job_id}] Starting Dual Research (Perplexity + Gemini)...")
-        # Run both research agents in parallel
-        results = await asyncio.gather(
-            research_service.conduct_deep_research(questionnaire),
-            gemini_research_service.conduct_creative_research(questionnaire)
+        competitors = questionnaire.market_context.main_competitors or []
+        logger.info(f"[Job {job_id}] Starting Quad Research (Perplexity + Gemini + Brand Audit + News)")
+
+        async def safe_perplexity():
+            try:
+                return await research_service.conduct_deep_research(questionnaire)
+            except Exception as e:
+                logger.warning(f"[Job {job_id}] Perplexity research failed, continuing without it: {e}")
+                return {}
+
+        async def safe_brand_audit():
+            try:
+                return await brand_audit_service.audit_brand_website(
+                    str(questionnaire.project_metadata.website_url),
+                    questionnaire.project_metadata.brand_name,
+                )
+            except Exception as e:
+                logger.warning(f"[Job {job_id}] Brand audit failed, continuing without it: {e}")
+                return {}
+
+        async def safe_news_research():
+            try:
+                return await asyncio.to_thread(
+                    news_research_service.conduct_news_research,
+                    questionnaire.project_metadata.brand_name,
+                    questionnaire.project_metadata.industry,
+                    competitors,
+                )
+            except Exception as e:
+                logger.warning(f"[Job {job_id}] News research failed, continuing without it: {e}")
+                return {}
+
+        perplexity_results, gemini_results, brand_audit, news_results = await asyncio.wait_for(
+            asyncio.gather(
+                safe_perplexity(),
+                gemini_research_service.conduct_creative_research(questionnaire),
+                safe_brand_audit(),
+                safe_news_research(),
+            ),
+            timeout=settings.RESEARCH_TIMEOUT,
         )
-        perplexity_results = results[0]
-        gemini_results = results[1]
-        
+
+        if not perplexity_results:
+            logger.warning(f"[Job {job_id}] Running in Gemini-only research mode")
+        if not brand_audit:
+            logger.warning(f"[Job {job_id}] Brand audit unavailable — proceeding without homepage data")
+        if not news_results:
+            logger.info(f"[Job {job_id}] News research unavailable (NEWSAPI_KEY not set or failed)")
+
         # 3. Consolidate Research
-        print(f"[Job {job_id}] Consolidating Research...")
-        consolidated_research = await research_consolidator.consolidate_research(perplexity_results, gemini_results)
-        
-        # 4. Persist Research to Storage
+        step = "consolidation"
+        logger.info(f"[Job {job_id}] Consolidating Research")
+        consolidated_research = research_consolidator.consolidate_research(
+            perplexity_results, gemini_results, brand_audit, news_results=news_results,
+        )
+
+        # 4. Persist Research artifacts
+        step = "persist_research"
         storage_service.upload_json(f"jobs/{job_id}/research_perplexity.json", perplexity_results)
         storage_service.upload_json(f"jobs/{job_id}/research_gemini.json", gemini_results)
+        storage_service.upload_json(f"jobs/{job_id}/research_brand_audit.json", brand_audit)
+        storage_service.upload_json(f"jobs/{job_id}/research_news.json", news_results)
         storage_service.upload_json(f"jobs/{job_id}/research_consolidated.json", consolidated_research)
-        print(f"[Job {job_id}] Research saved.")
+        logger.info(f"[Job {job_id}] Research artifacts saved")
 
-        # 5. Run Triple Analysis
-        print(f"[Job {job_id}] Starting Triple Analysis (GPT-4o, Gemini, Perplexity)...")
+        # 5. Run Triple Analysis in parallel with timeout
+        step = "triple_analysis"
+        logger.info(f"[Job {job_id}] Starting Triple Analysis (GPT-4o, Gemini, Perplexity)")
         job.status = JobStatus.ANALYZING
         db.commit()
 
-        # Run 3 models in parallel
-        triple_analysis_results = await multi_analysis_service.run_triple_analysis(request_data, consolidated_research)
+        triple_analysis_results = await asyncio.wait_for(
+            multi_analysis_service.run_triple_analysis(request_data, consolidated_research),
+            timeout=settings.ANALYSIS_TIMEOUT,
+        )
         storage_service.upload_json(f"jobs/{job_id}/analysis_raw_triple.json", triple_analysis_results)
-        
+
         # 6. Generate Consensus
-        print(f"[Job {job_id}] Generating Consensus...")
+        step = "consensus"
+        logger.info(f"[Job {job_id}] Generating Consensus")
         consensus_result = consensus_service.generate_consensus(triple_analysis_results)
-        
-        # 7. Persist Consensus to Storage (as the main analysis result)
-        analysis_key = f"jobs/{job_id}/analysis.json"
-        storage_service.upload_json(analysis_key, consensus_result)
-        print(f"[Job {job_id}] Consensus Analysis saved to {analysis_key}")
-        
-        # 8. Structure Slides (using Consensus data)
-        print(f"[Job {job_id}] Structuring Slides...")
-        slide_structure = presentation_service.structure_content(request_data, consensus_result)
-        
-        structure_key = f"jobs/{job_id}/slides.json"
-        storage_service.upload_json(structure_key, slide_structure)
-        
-        # 9. Generate PPTX
-        print(f"[Job {job_id}] Generating PowerPoint...")
-        temp_pptx = f"/tmp/{job_id}.pptx"
-        generated_path = presentation_service.generate_pptx(slide_structure, temp_pptx)
-        
-        if generated_path:
-            pptx_key = f"jobs/{job_id}/presentation.pptx"
-            storage_service.upload_file(pptx_key, generated_path, content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation")
-            print(f"[Job {job_id}] PPTX saved to {pptx_key}")
-            
-            # Clean up
-            os.remove(generated_path)
-        else:
-            print(f"[Job {job_id}] PPTX Generation Failed")
+        storage_service.upload_json(f"jobs/{job_id}/analysis.json", consensus_result)
+        logger.info(f"[Job {job_id}] Consensus saved")
 
-        # 8. Workflow Complete
-        job.status = JobStatus.COMPLETED 
-        db.commit()
-        
-        print(f"[Job {job_id}] Workflow Complete.")
+        # 7. Structure Slides
+        step = "slide_structure"
+        logger.info(f"[Job {job_id}] Structuring Slides")
 
-    except Exception as e:
-        print(f"[Job {job_id}] Workflow FAILED: {e}")
-        traceback.print_exc()
+        # Enrich consensus result with research snapshots for richer slide copy
+        consensus_with_research = {
+            **consensus_result,
+            "perplexity_research_snapshot": perplexity_results,
+            "brand_audit_snapshot": brand_audit,
+            "news_snapshot": news_results,
+        }
+        slide_structure = presentation_service.structure_content(request_data, consensus_with_research)
+        storage_service.upload_json(f"jobs/{job_id}/slides.json", slide_structure)
+
+        # 8. Generate PPTX using a safe temp file
+        step = "pptx_generation"
+        logger.info(f"[Job {job_id}] Generating PowerPoint")
+        with tempfile.NamedTemporaryFile(suffix=".pptx", delete=False) as tmp:
+            temp_pptx = tmp.name
+
         try:
-            job = db.query(Job).filter(Job.id == job_id).first()
-            if job:
-                job.status = JobStatus.FAILED
-                db.commit()
-        except:
-            pass
+            generated_path = presentation_service.generate_pptx(slide_structure, temp_pptx, questionnaire=request_data)
+            if generated_path:
+                pptx_key = f"jobs/{job_id}/presentation.pptx"
+                storage_service.upload_file(
+                    pptx_key,
+                    generated_path,
+                    content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                )
+                logger.info(f"[Job {job_id}] PPTX saved to {pptx_key}")
+            else:
+                raise RuntimeError("presentation_service.generate_pptx returned None")
+        finally:
+            if os.path.exists(temp_pptx):
+                os.remove(temp_pptx)
+
+        # 9. Done
+        step = "complete"
+        job.status = JobStatus.COMPLETED
+        db.commit()
+        logger.info(f"[Job {job_id}] Workflow complete")
+
+    except asyncio.TimeoutError as e:
+        logger.error(f"[Job {job_id}] Timeout at step '{step}': {e}")
+        _fail_job(db, job_id, step, e)
+    except Exception as e:
+        logger.error(f"[Job {job_id}] Workflow failed at step '{step}': {e}")
+        traceback.print_exc()
+        _fail_job(db, job_id, step, e)
     finally:
         db.close()
