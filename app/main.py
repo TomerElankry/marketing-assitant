@@ -1,5 +1,6 @@
 import logging
 import sys
+from sqlalchemy import text
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
@@ -8,6 +9,7 @@ from app.core.config import settings
 from app.api import endpoints
 from app.api.auth_endpoints import router as auth_router
 from app.api.admin_endpoints import router as admin_router
+from app.api.client_endpoints import router as client_router
 from app.db.base import Base
 from app.db.session import engine
 from app.db import models  # Import models to register them
@@ -22,6 +24,13 @@ logger = logging.getLogger(__name__)
 
 # Create tables (checkfirst=True skips objects that already exist)
 Base.metadata.create_all(bind=engine, checkfirst=True)
+
+# Incremental migrations — safe to run repeatedly (IF NOT EXISTS / DROP NOT NULL is idempotent)
+with engine.connect() as _conn:
+    _conn.execute(text("ALTER TABLE jobs ADD COLUMN IF NOT EXISTS client_id UUID REFERENCES clients(id)"))
+    _conn.execute(text("ALTER TABLE chat_messages ALTER COLUMN job_id DROP NOT NULL"))
+    _conn.execute(text("ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS client_id UUID REFERENCES clients(id)"))
+    _conn.commit()
 
 app = FastAPI(title=settings.PROJECT_NAME)
 
@@ -43,6 +52,7 @@ async def validation_exception_handler(request, exc):
 
 app.include_router(auth_router, prefix=settings.API_V1_STR)
 app.include_router(admin_router, prefix=settings.API_V1_STR)
+app.include_router(client_router, prefix=settings.API_V1_STR)
 app.include_router(endpoints.router, prefix=settings.API_V1_STR)
 
 

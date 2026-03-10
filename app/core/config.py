@@ -39,6 +39,11 @@ class Settings(BaseSettings):
     # Google OAuth
     GOOGLE_CLIENT_ID: str = ""
 
+    # Canva OAuth
+    CANVA_CLIENT_ID: str = ""
+    CANVA_CLIENT_SECRET: str = ""
+    CANVA_REDIRECT_URI: str = "http://localhost:8000/auth/canva/callback"
+
     # Email (SMTP) — for password reset emails
     SMTP_HOST: str = ""
     SMTP_PORT: int = 587

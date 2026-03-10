@@ -17,6 +17,14 @@ class UserResponse(BaseModel):
     is_active: bool
     is_admin: bool
     created_at: datetime
+    canva_connected: bool = False
+
+    @classmethod
+    def model_validate(cls, obj, **kwargs):
+        instance = super().model_validate(obj, **kwargs)
+        if hasattr(obj, "canva_access_token"):
+            instance.canva_connected = obj.canva_access_token is not None
+        return instance
 
     model_config = {"from_attributes": True}
 
