@@ -159,6 +159,72 @@ def google_login(payload: GoogleTokenPayload, db: Session = Depends(get_db)):
     return UserWithToken(access_token=token, user=UserResponse.model_validate(user))
 
 
+@router.get("/canva", response_model=dict)
+def canva_connect(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Initiate Canva OAuth flow. Returns the authorization URL."""
+    from app.core.config import settings
+    from app.services import canva_service
+
+    if not settings.CANVA_CLIENT_ID:
+        raise HTTPException(
+            status_code=status.HTTP_501_NOT_IMPLEMENTED,
+            detail="Canva integration is not configured on this server.",
+        )
+
+    auth_url, verifier = canva_service.build_auth_url(str(current_user.id))
+    current_user.canva_oauth_verifier = verifier
+    db.commit()
+    return {"auth_url": auth_url}
+
+
+@router.get("/canva/callback")
+def canva_callback(db: Session = Depends(get_db), code: str = None, state: str = None, error: str = None):
+    """
+    Canva OAuth callback. Exchanges the code for tokens, stores them, and
+    redirects back to the frontend.
+    """
+    from fastapi.responses import RedirectResponse
+    from app.core.config import settings
+    from app.services import canva_service
+
+    if error or not code or not state:
+        logger.warning(f"Canva OAuth error: {error}")
+        return RedirectResponse(url=f"{settings.FRONTEND_URL}/?canva=error")
+
+    user = db.query(User).filter(User.id == state).first()
+    if not user or not user.canva_oauth_verifier:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth state.")
+
+    try:
+        access_token, refresh_token, expires_at = canva_service.exchange_code(
+            code, user.canva_oauth_verifier
+        )
+    except Exception as exc:
+        logger.error(f"Canva token exchange failed: {exc}")
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Canva token exchange failed.")
+
+    user.canva_access_token = access_token
+    user.canva_refresh_token = refresh_token
+    user.canva_token_expires_at = expires_at
+    user.canva_oauth_verifier = None
+    db.commit()
+
+    logger.info(f"Canva connected for user {user.email}")
+    return RedirectResponse(url=f"{settings.FRONTEND_URL}/?canva=connected")
+
+
+@router.delete("/canva", status_code=status.HTTP_200_OK)
+def canva_disconnect(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Disconnect Canva by clearing stored tokens."""
+    current_user.canva_access_token = None
+    current_user.canva_refresh_token = None
+    current_user.canva_token_expires_at = None
+    current_user.canva_oauth_verifier = None
+    db.commit()
+    logger.info(f"Canva disconnected for user {current_user.email}")
+    return {"ok": True}
+
+
 @router.post("/forgot-password", status_code=status.HTTP_200_OK)
 def forgot_password(payload: ForgotPasswordRequest, db: Session = Depends(get_db)):
     """Request a password reset email. Always returns 200 to avoid email enumeration."""

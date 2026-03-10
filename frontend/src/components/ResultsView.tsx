@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import api from '../lib/api';
-import { Download, Lightbulb, TrendingUp, Target, Loader2, Copy, Check, ChevronDown, ChevronUp, Radio, Zap, Globe } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { Download, Lightbulb, TrendingUp, Target, Loader2, Copy, Check, ChevronDown, ChevronUp, Radio, Zap, Globe, ExternalLink } from 'lucide-react';
 
 interface ResultsViewProps {
     jobId: string;
@@ -19,6 +20,7 @@ function useCopyToClipboard() {
 }
 
 const ResultsView: React.FC<ResultsViewProps> = ({ jobId }) => {
+    const { user, connectCanva } = useAuth();
     const { data: analysis, isLoading } = useQuery({
         queryKey: ['jobAnalysis', jobId],
         queryFn: async () => {
@@ -39,6 +41,8 @@ const ResultsView: React.FC<ResultsViewProps> = ({ jobId }) => {
     };
 
     const [downloading, setDownloading] = useState(false);
+    const [canvaImporting, setCanvaImporting] = useState(false);
+    const [canvaError, setCanvaError] = useState<string | null>(null);
 
     const handleDownload = async () => {
         setDownloading(true);
@@ -56,6 +60,20 @@ const ResultsView: React.FC<ResultsViewProps> = ({ jobId }) => {
             setDownloading(false);
         }
     };
+
+    const handleEditInCanva = async () => {
+        setCanvaImporting(true);
+        setCanvaError(null);
+        try {
+            const res = await api.post<{ edit_url: string }>(`/jobs/${jobId}/canva-import`);
+            window.open(res.data.edit_url, '_blank');
+        } catch (err: any) {
+            setCanvaError(err?.response?.data?.detail ?? 'Canva import failed. Please try again.');
+        } finally {
+            setCanvaImporting(false);
+        }
+    };
+
 
     if (isLoading) {
         return (
@@ -109,19 +127,41 @@ const ResultsView: React.FC<ResultsViewProps> = ({ jobId }) => {
                         </div>
                     </div>
 
-                    <button
-                        onClick={handleDownload}
-                        disabled={downloading}
-                        className="group inline-flex items-center gap-3 px-10 py-5 bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 hover:from-blue-500 hover:via-purple-500 hover:to-cyan-500 text-white font-bold text-lg rounded-full hover:scale-105 active:scale-95 transition-all glow-blue hover:glow-purple relative overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed"
-                    >
-                        <span className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></span>
-                        {downloading
-                            ? <Loader2 size={24} className="relative z-10 animate-spin" />
-                            : <Download size={24} className="relative z-10 group-hover:animate-bounce" />
-                        }
-                        <span className="relative z-10">{downloading ? 'Preparing…' : 'Download Presentation (.pptx)'}</span>
-                    </button>
-                    <p className="text-xs text-slate-400 mt-3 font-mono">Ready for PowerPoint</p>
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                        <button
+                            onClick={handleDownload}
+                            disabled={downloading}
+                            className="group inline-flex items-center gap-3 px-10 py-5 bg-gradient-to-r from-blue-600 via-purple-600 to-cyan-600 hover:from-blue-500 hover:via-purple-500 hover:to-cyan-500 text-white font-bold text-lg rounded-full hover:scale-105 active:scale-95 transition-all glow-blue hover:glow-purple relative overflow-hidden disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                            <span className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity"></span>
+                            {downloading
+                                ? <Loader2 size={24} className="relative z-10 animate-spin" />
+                                : <Download size={24} className="relative z-10 group-hover:animate-bounce" />
+                            }
+                            <span className="relative z-10">{downloading ? 'Preparing…' : 'Download (.pptx)'}</span>
+                        </button>
+
+                        <button
+                            onClick={user?.canva_connected ? handleEditInCanva : connectCanva}
+                            disabled={canvaImporting}
+                            className="inline-flex items-center gap-2.5 px-8 py-5 bg-[#7D2AE8] hover:bg-[#6a22cc] text-white font-bold text-lg rounded-full hover:scale-105 active:scale-95 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                            {canvaImporting
+                                ? <Loader2 size={20} className="animate-spin" />
+                                : <ExternalLink size={20} />
+                            }
+                            {canvaImporting ? 'Importing…' : 'Edit in Canva'}
+                        </button>
+                    </div>
+
+                    {canvaError && (
+                        <p className="text-xs text-red-400 mt-2 font-mono">{canvaError}</p>
+                    )}
+                    <p className="text-xs text-slate-400 mt-3 font-mono">
+                        {user?.canva_connected
+                            ? 'Download to PowerPoint or edit directly in Canva'
+                            : 'Click "Edit in Canva" to connect your Canva account'}
+                    </p>
                 </div>
             </div>
 

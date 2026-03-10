@@ -99,4 +99,5 @@ export interface UserResponse {
     is_active: boolean;
     is_admin: boolean;
     created_at: string;
+    canva_connected: boolean;
 }

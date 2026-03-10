@@ -282,3 +282,63 @@ def download_presentation(
             "Content-Disposition": f'attachment; filename="marketing_strategy_{job_id}.pptx"'
         },
     )
+
+
+@router.post("/jobs/{job_id}/canva-import", summary="Import Presentation into Canva")
+def canva_import(
+    job_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Imports the job's PPTX into the user's Canva account and returns an edit URL.
+    Requires the user to have connected their Canva account.
+    """
+    from datetime import datetime
+    from app.services import canva_service
+
+    if not current_user.canva_access_token:
+        raise HTTPException(status_code=401, detail="Canva account not connected. Connect it from your profile menu.")
+
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if not current_user.is_admin and job.user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not authorised to access this job")
+    if job.status != JobStatus.COMPLETED:
+        raise HTTPException(status_code=400, detail="Job is not yet complete")
+
+    # Refresh token if expired
+    if current_user.canva_token_expires_at and current_user.canva_token_expires_at <= datetime.utcnow():
+        if not current_user.canva_refresh_token:
+            raise HTTPException(status_code=401, detail="Canva session expired. Please reconnect Canva.")
+        try:
+            new_access, new_refresh, new_expires = canva_service.refresh_access_token(
+                current_user.canva_refresh_token
+            )
+            current_user.canva_access_token = new_access
+            current_user.canva_refresh_token = new_refresh
+            current_user.canva_token_expires_at = new_expires
+            db.commit()
+        except Exception as exc:
+            logger.error(f"Canva token refresh failed: {exc}")
+            raise HTTPException(status_code=401, detail="Could not refresh Canva session. Please reconnect Canva.")
+
+    # Fetch PPTX bytes from storage
+    pptx_key = f"jobs/{job_id}/presentation.pptx"
+    file_stream = storage_service.get_file_stream(pptx_key)
+    if not file_stream:
+        raise HTTPException(status_code=404, detail="Presentation file not found")
+
+    pptx_bytes = file_stream.read()
+    filename = f"marketing_strategy_{job_id}.pptx"
+
+    try:
+        edit_url = canva_service.import_pptx(current_user.canva_access_token, pptx_bytes, filename)
+    except TimeoutError:
+        raise HTTPException(status_code=504, detail="Canva import timed out. Please try again.")
+    except Exception as exc:
+        logger.error(f"Canva import failed for job {job_id}: {exc}")
+        raise HTTPException(status_code=502, detail="Canva import failed. Please try again.")
+
+    return {"edit_url": edit_url}

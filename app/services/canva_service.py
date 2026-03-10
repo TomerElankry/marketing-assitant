@@ -1,5 +1,6 @@
 import hashlib
 import base64
+import json
 import os
 import time
 import httpx
@@ -96,15 +97,20 @@ def import_pptx(access_token: str, pptx_bytes: bytes, filename: str) -> str:
     Upload a PPTX file to Canva and return the edit URL.
     Polls until the import job completes (up to 60 seconds).
     """
+    # Import-Metadata header: title must be base64-encoded, mime_type tells Canva the file format
+    import_metadata = json.dumps({
+        "title_base64": base64.b64encode(filename.encode()).decode(),
+        "mime_type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    })
+
     # Start the import job
     resp = httpx.post(
         CANVA_IMPORT_URL,
         content=pptx_bytes,
         headers={
             "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            "Import-Type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-            "Name": filename,
+            "Content-Type": "application/octet-stream",
+            "Import-Metadata": import_metadata,
         },
         timeout=30,
     )
@@ -130,7 +136,10 @@ def import_pptx(access_token: str, pptx_bytes: bytes, filename: str) -> str:
         status = job.get("status")
 
         if status == "success":
-            design_id = job.get("result", {}).get("design", {}).get("id")
+            result = job.get("result", {})
+            # Handle both singular and array design response shapes
+            design = result.get("design") or (result.get("designs") or [{}])[0]
+            design_id = design.get("id")
             if not design_id:
                 raise ValueError(f"Canva import succeeded but no design ID returned: {poll_data}")
             return f"https://www.canva.com/design/{design_id}/edit"

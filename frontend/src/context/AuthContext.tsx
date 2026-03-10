@@ -12,6 +12,8 @@ interface AuthContextType {
     logout: () => void;
     forgotPassword: (email: string) => Promise<void>;
     resetPassword: (token: string, newPassword: string) => Promise<void>;
+    connectCanva: () => Promise<void>;
+    disconnectCanva: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -30,9 +32,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     const [isLoading, setIsLoading] = useState(() => !!localStorage.getItem(TOKEN_KEY));
 
-    // On mount: validate the token in the background
+    // On mount: validate the token; also detect Canva OAuth callback (?canva=connected)
     useEffect(() => {
         const token = localStorage.getItem(TOKEN_KEY);
+
+        // If Canva just redirected back, strip the query param and refresh user
+        const params = new URLSearchParams(window.location.search);
+        const canvaConnected = params.get('canva') === 'connected';
+        if (canvaConnected) {
+            params.delete('canva');
+            const newSearch = params.toString();
+            window.history.replaceState({}, '', newSearch ? `?${newSearch}` : window.location.pathname);
+        }
+
         if (!token) {
             setIsLoading(false);
             return;
@@ -98,8 +110,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await api.post('/auth/reset-password', { token, new_password: newPassword });
     };
 
+    const connectCanva = async () => {
+        const res = await api.get<{ auth_url: string }>('/auth/canva');
+        window.location.href = res.data.auth_url;
+    };
+
+    const disconnectCanva = async () => {
+        await api.delete('/auth/canva');
+        const res = await api.get<UserResponse>('/auth/me');
+        setUser(res.data);
+        localStorage.setItem(USER_CACHE_KEY, JSON.stringify(res.data));
+    };
+
     return (
-        <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, register, loginWithGoogle, logout, forgotPassword, resetPassword }}>
+        <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, register, loginWithGoogle, logout, forgotPassword, resetPassword, connectCanva, disconnectCanva }}>
             {children}
         </AuthContext.Provider>
     );

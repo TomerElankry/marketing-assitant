@@ -16,7 +16,7 @@ const JOB_RESUME_KEY = 'phil_resume_job';
 type View = 'clients' | 'client-detail' | 'new-client' | 'edit-client' | 'new-campaign' | 'processing' | 'results';
 
 function AppInner() {
-    const { isAuthenticated, isLoading, user, logout } = useAuth();
+    const { isAuthenticated, isLoading, user, logout, connectCanva, disconnectCanva } = useAuth();
     const queryClient = useQueryClient();
     const [view, setView] = useState<View>('clients');
     const [currentClientId, setCurrentClientId] = useState<string | null>(null);
@@ -162,6 +162,26 @@ function AppInner() {
 
                     {/* Right controls */}
                     <div className="flex items-center gap-2">
+                        {/* Canva connection chip */}
+                        {user?.canva_connected ? (
+                            <div className="flex items-center gap-1 text-xs bg-emerald-50 border border-emerald-200 text-emerald-700 px-2 py-1.5 rounded-lg">
+                                <span className="font-medium">Canva ✓</span>
+                                <button
+                                    onClick={disconnectCanva}
+                                    title="Disconnect Canva"
+                                    className="text-emerald-400 hover:text-red-500 transition-colors ml-0.5"
+                                >
+                                    ✕
+                                </button>
+                            </div>
+                        ) : (
+                            <button
+                                onClick={connectCanva}
+                                className="text-xs text-[#78716C] hover:text-[#1E3A5F] border border-[#E7E5E4] hover:border-[#1E3A5F] bg-white px-2.5 py-1.5 rounded-lg transition-colors"
+                            >
+                                Connect Canva
+                            </button>
+                        )}
                         <div className="flex items-center gap-1.5 text-xs text-[#78716C] px-2 py-1.5 rounded-lg border border-[#E7E5E4] bg-white">
                             <span className="hidden sm:inline max-w-[120px] truncate">{user?.email}</span>
                             <button
